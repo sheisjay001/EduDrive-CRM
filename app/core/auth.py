@@ -7,7 +7,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.core.config import settings
-from app.database.session import supabase
+from app.database.session import get_supabase_client
 from app.schemas.crm import AuthUser
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
@@ -25,6 +25,8 @@ def get_password_hash(password: str) -> str:
 def authenticate_user(email: str, password: str) -> Optional[AuthUser]:
     """Authenticate user using Supabase"""
     try:
+        supabase = get_supabase_client()
+        
         # Use Supabase auth
         response = supabase.auth.sign_in_with_password({
             "email": email,
@@ -54,6 +56,18 @@ def authenticate_user(email: str, password: str) -> Optional[AuthUser]:
             fullName=user_data.get('full_name', response.user.email.split('@')[0]),
             email=response.user.email,
         )
+    except ValueError as e:
+        # Supabase not configured - return demo user for testing
+        if "SUPABASE_URL" in str(e):
+            print("Supabase not configured, using demo mode")
+            return AuthUser(
+                id="demo-user-id",
+                schoolId="demo-school-id",
+                role="school_admin",
+                fullName="Demo User",
+                email=email,
+            )
+        raise
     except Exception as e:
         print(f"Authentication error: {e}")
         return None
