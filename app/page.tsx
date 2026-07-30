@@ -44,7 +44,7 @@ export default function Home() {
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "admin@greenfieldcollege.ng",
-      password: "password123",
+      password: "Admin@123",
     },
   });
 
@@ -142,6 +142,17 @@ export default function Home() {
                 {submitting ? "Signing in..." : "Enter EduDrive"}
                 <ArrowRight className="h-4 w-4" />
               </Button>
+
+              <p className="mt-4 text-center text-sm text-[#9eb1cf]">
+                Don't have an account?{" "}
+                <button
+                  type="button"
+                  className="text-[#d9a441] hover:text-[#d9a441]/80 transition"
+                  onClick={() => router.push("/signup")}
+                >
+                  Sign up for EduDrive
+                </button>
+              </p>
             </form>
 
             <div className="mt-8 rounded-[28px] border border-white/10 bg-white/5 p-5">
