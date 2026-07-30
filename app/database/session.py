@@ -1,8 +1,12 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from supabase import create_client, Client
 
 from app.core.config import settings
 
 
-engine = create_engine(settings.database_url, future=True, echo=False)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+def get_supabase() -> Client:
+    """Get Supabase client instance"""
+    return create_client(settings.supabase_url, settings.supabase_key)
+
+
+# Global Supabase client
+supabase: Client = get_supabase()

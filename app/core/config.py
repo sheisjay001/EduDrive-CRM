@@ -5,7 +5,8 @@ class Settings(BaseSettings):
     app_name: str = "EduDrive CRM API"
     api_prefix: str = "/api/v1"
     debug: bool = True
-    database_url: str = "sqlite:///./edudrive.db"
+    supabase_url: str = ""
+    supabase_key: str = ""
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60

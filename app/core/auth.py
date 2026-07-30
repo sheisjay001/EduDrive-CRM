@@ -5,24 +5,13 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.database.session import SessionLocal
-from app.models.entities import User, School
-from app.repositories import UserRepository, SchoolRepository
+from app.database.session import supabase
 from app.schemas.crm import AuthUser
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_prefix}/auth/login")
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -33,40 +22,41 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def get_user_by_email(db: Session, email: str, school_id: Optional[str] = None) -> Optional[User]:
-    user_repo = UserRepository(db)
-    if school_id:
-        return user_repo.get_by_email(email, school_id)
-    return None
-
-
-def authenticate_user(db: Session, email: str, password: str) -> Optional[AuthUser]:
-    user_repo = UserRepository(db)
-    school_repo = SchoolRepository(db)
-    
-    # Try to find user by email across all schools
-    from sqlalchemy import select
-    stmt = select(User).where(User.email == email)
-    result = db.execute(stmt)
-    user = result.scalar_one_or_none()
-    
-    if not user:
+def authenticate_user(email: str, password: str) -> Optional[AuthUser]:
+    """Authenticate user using Supabase"""
+    try:
+        # Use Supabase auth
+        response = supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": password
+        })
+        
+        if not response.user:
+            return None
+        
+        # Get user metadata from Supabase
+        user_data = response.user.user_metadata
+        
+        # Get user role from custom user_roles table
+        role_response = supabase.table('user_roles').select('role, school_id').eq('user_id', response.user.id).execute()
+        
+        role = "school_admin"  # Default
+        school_id = ""
+        
+        if role_response.data:
+            role = role_response.data[0].get('role', 'school_admin')
+            school_id = role_response.data[0].get('school_id', '')
+        
+        return AuthUser(
+            id=response.user.id,
+            schoolId=school_id,
+            role=role,
+            fullName=user_data.get('full_name', response.user.email.split('@')[0]),
+            email=response.user.email,
+        )
+    except Exception as e:
+        print(f"Authentication error: {e}")
         return None
-    
-    if not verify_password(password, user.password_hash):
-        return None
-    
-    school = school_repo.get_by_id(user.school_id)
-    if not school:
-        return None
-    
-    return AuthUser(
-        id=user.id,
-        schoolId=user.school_id,
-        role="school_admin",  # Default role for now
-        fullName=user.full_name,
-        email=user.email,
-    )
 
 
 def create_access_token(subject: str, extra: dict | None = None, expires_delta: timedelta | None = None) -> str:
@@ -122,7 +112,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> AuthUser:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # For demo mode, reconstruct user from token claims to avoid DB lookup.
+    # Reconstruct user from token claims
     email = payload.get("sub")
     school_id = payload.get("schoolId")
     role = payload.get("role")
