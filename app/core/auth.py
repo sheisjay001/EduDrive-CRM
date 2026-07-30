@@ -27,27 +27,39 @@ def authenticate_user(email: str, password: str) -> Optional[AuthUser]:
     try:
         supabase = get_supabase_client()
         
+        print(f"Attempting to authenticate user: {email}")
+        
         # Use Supabase auth
         response = supabase.auth.sign_in_with_password({
             "email": email,
             "password": password
         })
         
+        print(f"Supabase auth response: {response}")
+        
         if not response.user:
+            print("No user returned from Supabase")
             return None
         
         # Get user metadata from Supabase
         user_data = response.user.user_metadata
         
         # Get user role from custom user_roles table
-        role_response = supabase.table('user_roles').select('role, school_id').eq('user_id', response.user.id).execute()
+        try:
+            role_response = supabase.table('user_roles').select('role, school_id').eq('user_id', response.user.id).execute()
+            print(f"Role response: {role_response}")
+        except Exception as e:
+            print(f"Error fetching user roles: {e}")
+            role_response = None
         
         role = "school_admin"  # Default
         school_id = ""
         
-        if role_response.data:
+        if role_response and role_response.data:
             role = role_response.data[0].get('role', 'school_admin')
             school_id = role_response.data[0].get('school_id', '')
+        
+        print(f"Authenticated user: {response.user.email} with role: {role}")
         
         return AuthUser(
             id=response.user.id,
@@ -67,9 +79,12 @@ def authenticate_user(email: str, password: str) -> Optional[AuthUser]:
                 fullName="Demo User",
                 email=email,
             )
-        raise
+        print(f"Value error during authentication: {e}")
+        return None
     except Exception as e:
         print(f"Authentication error: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
