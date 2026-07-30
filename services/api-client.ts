@@ -83,6 +83,21 @@ export const apiClient = {
 
     return backendResponse;
   },
+
+  async signup(payload: { fullName: string; email: string; password: string }) {
+    const backendResponse = await request<AuthResponse>("/auth/signup", {} as AuthResponse, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    // Save tokens and user info from backend response
+    if (backendResponse.access_token) {
+      saveAuthTokens(backendResponse.access_token, backendResponse.refresh_token || "");
+    }
+    saveUser(backendResponse.user);
+
+    return backendResponse;
+  },
   forgotPassword(payload: ForgotPasswordPayload) {
     return request<PasswordResetResponse>(
       "/auth/forgot-password",
