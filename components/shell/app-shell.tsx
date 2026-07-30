@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
   ChartSpline,
@@ -10,6 +10,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   LifeBuoy,
+  LogOut,
   MessageSquareText,
   Settings,
   ShieldCheck,
@@ -20,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn, initialsFromName } from "@/lib/utils";
+import { clearAuthTokens } from "@/services/auth-storage";
 
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -44,6 +46,12 @@ type AppShellProps = {
 
 export function AppShell({ title, eyebrow, description, children }: AppShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    clearAuthTokens();
+    router.push("/login");
+  };
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(217,164,65,0.16),_transparent_22%),linear-gradient(180deg,#14213d_0%,#0b1225_55%,#080d19_100%)] text-[#f6f1e8]">
@@ -81,6 +89,14 @@ export function AppShell({ title, eyebrow, description, children }: AppShellProp
                 </Link>
               );
             })}
+
+            <button
+              onClick={handleLogout}
+              className="flex w-full items-center gap-3 rounded-2xl border border-transparent bg-transparent px-4 py-3 text-sm text-[#9eb1cf] transition-all hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Logout</span>
+            </button>
           </nav>
 
           <div className="mt-auto rounded-[24px] border border-white/10 bg-[#f6f1e8]/8 p-5">
