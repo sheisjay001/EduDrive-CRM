@@ -10,7 +10,8 @@ import {
   staffData,
   studentsData,
 } from "@/services/mock-data";
-import { clearAuthTokens, getAccessToken, saveAuthTokens } from "@/services/auth-storage";
+import { clearAuthTokens, getAccessToken, saveAuthTokens, saveUser } from "@/services/auth-storage";
+import { supabase } from "@/lib/supabase";
 import type {
   AdmissionsResponse,
   AuthPayload,
@@ -69,16 +70,31 @@ async function request<T>(path: string, fallback: T, init?: RequestInit): Promis
 
 export const apiClient = {
   async login(payload: AuthPayload) {
-    const response = await request<AuthResponse>("/auth/login", {} as AuthResponse, {
+    // Use Supabase authentication
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: payload.email,
+      password: payload.password,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data.session) {
+      throw new Error("No session returned");
+    }
+
+    // Get user role from backend using Supabase session
+    const backendResponse = await request<AuthResponse>("/auth/login", {} as AuthResponse, {
       method: "POST",
       body: JSON.stringify(payload),
     });
 
-    if (response.access_token && response.refresh_token) {
-      saveAuthTokens(response.access_token, response.refresh_token);
-    }
+    // Save tokens and user info
+    saveAuthTokens(data.session.access_token, data.session.refresh_token);
+    saveUser(backendResponse.user);
 
-    return response;
+    return backendResponse;
   },
   forgotPassword(payload: ForgotPasswordPayload) {
     return request<PasswordResetResponse>(
