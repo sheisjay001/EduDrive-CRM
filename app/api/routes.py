@@ -61,7 +61,7 @@ def login(payload: AuthRequest) -> AuthResponse:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
-    
+
     access_token, refresh_token = create_tokens_for_user(user)
     return AuthResponse(
         access_token=access_token,
@@ -70,6 +70,57 @@ def login(payload: AuthRequest) -> AuthResponse:
         expires_in=3600,
         user=user,
     )
+
+
+@router.post("/auth/signup", response_model=AuthResponse)
+def signup(payload: dict) -> AuthResponse:
+    """Create a new user in Supabase and authenticate them"""
+    try:
+        supabase = get_supabase_client()
+
+        # Create user in Supabase Auth
+        response = supabase.auth.sign_up({
+            "email": payload["email"],
+            "password": payload["password"],
+            "options": {
+                "data": {
+                    "full_name": payload["fullName"]
+                }
+            }
+        })
+
+        if not response.user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to create user"
+            )
+
+        # Get user metadata
+        user_data = response.user.user_metadata
+
+        # Create AuthUser object
+        user = AuthUser(
+            id=response.user.id,
+            schoolId="",
+            role="school_admin",  # Default role for new signups
+            fullName=user_data.get('full_name', payload["fullName"]),
+            email=response.user.email,
+        )
+
+        access_token, refresh_token = create_tokens_for_user(user)
+        return AuthResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_type="bearer",
+            expires_in=3600,
+            user=user,
+        )
+    except Exception as e:
+        print(f"Signup error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
 
 
 @router.post("/auth/refresh", response_model=AuthResponse)
