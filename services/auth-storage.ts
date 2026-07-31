@@ -32,7 +32,7 @@ export function saveAuthTokens(accessToken: string, refreshToken: string): void 
   window.localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 }
 
-export function saveUser(user: any): void {
+export function saveUser(user: Record<string, unknown>): void {
   if (typeof window === "undefined") {
     return;
   }
@@ -40,7 +40,7 @@ export function saveUser(user: any): void {
   window.localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
-export function getUser(): any | null {
+export function getUser(): Record<string, unknown> | null {
   if (typeof window === "undefined") {
     return null;
   }

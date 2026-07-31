@@ -164,7 +164,7 @@ export const apiClient = {
       },
     );
   },
-  createLead(payload: any) {
+  createLead(payload: Record<string, unknown>) {
     return request<{ id: string }>(
       "/leads",
       {} as { id: string },

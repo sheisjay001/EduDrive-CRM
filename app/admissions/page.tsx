@@ -18,7 +18,7 @@ export default function AdmissionsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
 
-  const handleCreateLead = async (leadData: any) => {
+  const handleCreateLead = async (leadData: Record<string, unknown>) => {
     try {
       await apiClient.createLead(leadData);
       // Refresh data after creation

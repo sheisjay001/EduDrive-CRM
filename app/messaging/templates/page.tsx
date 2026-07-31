@@ -20,7 +20,7 @@ export default function MessageTemplatesPage() {
         <LoadingPanel />
       ) : (
         <div className="grid gap-6 lg:grid-cols-3">
-          {data.templates.map((template: any) => (
+          {data.templates.map((template: { id: string; name: string; channel: string; useCase: string; lastEdited: string }) => (
             <Card key={template.id} className="space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div>

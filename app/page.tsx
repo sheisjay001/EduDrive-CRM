@@ -53,14 +53,30 @@ export default function Home() {
     setError(null);
 
     try {
-      await apiClient.login(values);
-      router.push("/dashboard");
+      const response = await apiClient.login(values);
+      
+      // Redirect based on user role
+      const role = response.user.role;
+      const dashboardPath = getDashboardPath(role);
+      router.push(dashboardPath);
     } catch {
       setError("Unable to sign in right now. Please try again.");
     } finally {
       setSubmitting(false);
     }
   });
+
+  function getDashboardPath(role: string): string {
+    const rolePaths: Record<string, string> = {
+      super_admin: "/dashboard/super-admin",
+      school_admin: "/dashboard/school-admin",
+      admissions_officer: "/dashboard/admissions",
+      bursar: "/dashboard/bursar",
+      teacher: "/dashboard/teacher",
+      helpdesk_officer: "/dashboard/helpdesk",
+    };
+    return rolePaths[role] || "/dashboard/school-admin"; // Default to school-admin
+  }
 
   return (
     <main className="grain min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(217,164,65,0.18),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(11,143,106,0.14),_transparent_30%),linear-gradient(180deg,#14213d_0%,#0b1225_60%,#080d19_100%)] px-4 py-6 lg:px-6">
@@ -75,7 +91,7 @@ export default function Home() {
           <h1 className="mt-6 max-w-3xl font-serif text-5xl leading-tight text-white lg:text-7xl">
             Built for schools that want sharper operations and stronger parent trust.
           </h1>
-          <p className="mt-6 max-w-2xl text-sm leading-8 text-[#c3d0e3] lg:text-base">
+          <p className="mt-3 text-sm leading-7 text-[#c3d0e3]">
             One platform for admissions, student records, finance, communication, help desk, staff oversight, and reporting across private Nursery, Primary, and Secondary schools in Nigeria.
           </p>
 
@@ -144,7 +160,7 @@ export default function Home() {
               </Button>
 
               <p className="mt-4 text-center text-sm text-[#9eb1cf]">
-                Don't have an account?{" "}
+                Don&apos;t have an account?{" "}
                 <button
                   type="button"
                   className="text-[#d9a441] hover:text-[#d9a441]/80 transition"
