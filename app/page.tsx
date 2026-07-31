@@ -55,9 +55,13 @@ export default function Home() {
     try {
       const response = await apiClient.login(values);
       
+      console.log("Login response:", response);
+      console.log("User role:", response.user.role);
+      
       // Redirect based on user role
       const role = response.user.role;
       const dashboardPath = getDashboardPath(role);
+      console.log("Redirecting to:", dashboardPath);
       router.push(dashboardPath);
     } catch {
       setError("Unable to sign in right now. Please try again.");
@@ -68,14 +72,14 @@ export default function Home() {
 
   function getDashboardPath(role: string): string {
     const rolePaths: Record<string, string> = {
-      super_admin: "/dashboard/super-admin",
-      school_admin: "/dashboard/school-admin",
-      admissions_officer: "/dashboard/admissions",
-      bursar: "/dashboard/bursar",
-      teacher: "/dashboard/teacher",
-      helpdesk_officer: "/dashboard/helpdesk",
+      super_admin: "/dashboard",
+      school_admin: "/dashboard",
+      admissions_officer: "/dashboard",
+      bursar: "/dashboard",
+      teacher: "/dashboard",
+      helpdesk_officer: "/dashboard",
     };
-    return rolePaths[role] || "/dashboard/school-admin"; // Default to school-admin
+    return rolePaths[role] || "/dashboard";
   }
 
   return (

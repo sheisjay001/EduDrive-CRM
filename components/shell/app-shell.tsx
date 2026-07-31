@@ -23,19 +23,25 @@ import { Card } from "@/components/ui/card";
 import { cn, initialsFromName } from "@/lib/utils";
 import { clearAuthTokens } from "@/services/auth-storage";
 
-const navigation = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admissions", label: "Admissions", icon: ChartSpline },
-  { href: "/families", label: "Families", icon: Users },
-  { href: "/parents", label: "Parents", icon: Sparkles },
-  { href: "/students", label: "Students", icon: GraduationCap },
-  { href: "/finance", label: "Finance", icon: CreditCard },
-  { href: "/messaging", label: "Messaging", icon: MessageSquareText },
-  { href: "/helpdesk", label: "Help Desk", icon: LifeBuoy },
-  { href: "/staff", label: "Staff", icon: ShieldCheck },
-  { href: "/reports", label: "Reports", icon: FileBarChart2 },
-  { href: "/settings", label: "Settings", icon: Settings },
+import { getUser } from "@/services/auth-storage";
+
+const allNavigation = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["super_admin", "school_admin", "admissions_officer", "bursar", "teacher", "helpdesk_officer"] },
+  { href: "/admissions", label: "Admissions", icon: ChartSpline, roles: ["super_admin", "school_admin", "admissions_officer"] },
+  { href: "/families", label: "Families", icon: Users, roles: ["super_admin", "school_admin"] },
+  { href: "/parents", label: "Parents", icon: Sparkles, roles: ["super_admin", "school_admin", "admissions_officer", "teacher", "helpdesk_officer"] },
+  { href: "/students", label: "Students", icon: GraduationCap, roles: ["super_admin", "school_admin", "bursar", "teacher"] },
+  { href: "/finance", label: "Finance", icon: CreditCard, roles: ["super_admin", "school_admin", "bursar"] },
+  { href: "/messaging", label: "Messaging", icon: MessageSquareText, roles: ["super_admin", "school_admin"] },
+  { href: "/helpdesk", label: "Help Desk", icon: LifeBuoy, roles: ["super_admin", "school_admin", "helpdesk_officer"] },
+  { href: "/staff", label: "Staff", icon: ShieldCheck, roles: ["super_admin", "school_admin"] },
+  { href: "/reports", label: "Reports", icon: FileBarChart2, roles: ["super_admin", "school_admin"] },
+  { href: "/settings", label: "Settings", icon: Settings, roles: ["super_admin", "school_admin"] },
 ];
+
+function getNavigationForRole(role: string) {
+  return allNavigation.filter(item => item.roles.includes(role));
+}
 
 type AppShellProps = {
   title: string;
@@ -47,6 +53,9 @@ type AppShellProps = {
 export function AppShell({ title, eyebrow, description, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const user = getUser();
+  const userRole = (user as { role?: string })?.role || "school_admin";
+  const navigation = getNavigationForRole(userRole);
 
   const handleLogout = () => {
     clearAuthTokens();
