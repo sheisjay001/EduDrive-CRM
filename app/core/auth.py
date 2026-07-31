@@ -220,7 +220,7 @@ def has_permission(user: AuthUser, permission: str) -> bool:
     """Check if user has a specific permission based on their role"""
     role_permissions = {
         "super_admin": ["*"],
-        "school_admin": ["dashboard:*", "admissions:*", "finance:*", "helpdesk:*", "staff:*", "reports:*", "settings:*"],
+        "school_admin": ["*"],
         "admissions_officer": ["dashboard:view", "admissions:*", "leads:*", "parents:view"],
         "bursar": ["dashboard:view", "finance:*", "invoices:*", "payments:*", "students:view"],
         "teacher": ["dashboard:view", "students:*", "attendance:*", "behavior:*", "academic:*", "parents:view"],
