@@ -10,7 +10,10 @@ def get_supabase() -> Client:
     
     if not settings.supabase_url or not settings.supabase_key:
         raise ValueError("SUPABASE_URL and SUPABASE_KEY environment variables must be set")
-    return create_client(settings.supabase_url, settings.supabase_key)
+    
+    # Use service role key for backend operations (has full database access)
+    key = settings.supabase_service_role_key if settings.supabase_service_role_key else settings.supabase_key
+    return create_client(settings.supabase_url, key)
 
 
 # Global Supabase client (initialized lazily)

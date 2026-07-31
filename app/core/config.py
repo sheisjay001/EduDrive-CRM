@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     debug: bool = True
     supabase_url: str = ""
     supabase_key: str = ""
+    supabase_service_role_key: str = ""
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60

@@ -219,11 +219,11 @@ def require_any_role(required_roles: list[str]):
 def has_permission(user: AuthUser, permission: str) -> bool:
     """Check if user has a specific permission based on their role"""
     role_permissions = {
-        "super_admin": ["*"],
-        "school_admin": ["*"],
-        "admissions_officer": ["dashboard:view", "admissions:*", "leads:*", "parents:view"],
-        "bursar": ["dashboard:view", "finance:*", "invoices:*", "payments:*", "students:view"],
-        "teacher": ["dashboard:view", "students:*", "attendance:*", "behavior:*", "academic:*", "parents:view"],
+        "super_admin": ["*"],  # Full system access
+        "school_admin": ["dashboard:view", "admissions:*", "leads:*", "families:*", "parents:*", "students:*", "finance:*", "invoices:*", "payments:*", "messaging:*", "helpdesk:*", "tickets:*", "staff:*", "reports:*", "settings:*"],
+        "admissions_officer": ["dashboard:view", "admissions:view", "leads:*", "parents:view"],
+        "bursar": ["dashboard:view", "finance:view", "invoices:*", "payments:*", "students:view"],
+        "teacher": ["dashboard:view", "students:view", "attendance:*", "behavior:*", "academic:*", "parents:view"],
         "helpdesk_officer": ["dashboard:view", "helpdesk:*", "tickets:*", "parents:view"],
     }
     
