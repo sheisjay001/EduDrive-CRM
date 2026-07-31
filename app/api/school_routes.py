@@ -137,7 +137,7 @@ async def validate_school_slug(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail(str(e)))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/")
 async def create_school(
@@ -173,7 +173,7 @@ async def get_schools(
         result = supabase.table('active_schools').select('*').execute()
         return {"schools": result.data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail(str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.patch("/{school_id}")
 async def update_school(
@@ -203,4 +203,4 @@ async def update_school(
         
         return {"success": True, "school": result.data[0]}
     except Exception as e:
-        raise HTTPException(status_code=500, detail(str(e))
+        raise HTTPException(status_code=500, detail=str(e))
