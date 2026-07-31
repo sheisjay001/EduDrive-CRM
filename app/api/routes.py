@@ -58,6 +58,7 @@ from app.api.payment_routes import router as payment_router
 from app.api.messaging_routes import router as messaging_router
 from app.api.frontdesk_routes import router as frontdesk_router
 from app.api.school_routes import router as school_router
+from app.api.student_routes import router as student_router
 
 router = APIRouter()
 router.include_router(activity_router)
@@ -68,6 +69,7 @@ router.include_router(payment_router)
 router.include_router(messaging_router)
 router.include_router(frontdesk_router)
 router.include_router(school_router)
+router.include_router(student_router)
 
 
 @router.post("/auth/login", response_model=AuthResponse)
