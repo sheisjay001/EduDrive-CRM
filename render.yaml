@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: edudrive-crm-frontend
+    env: node
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://edudrive-crm-backend.onrender.com/api/v1
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        sync: false
