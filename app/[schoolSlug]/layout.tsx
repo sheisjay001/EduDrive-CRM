@@ -9,18 +9,19 @@ export default function SchoolLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: { schoolSlug: string };
+  params: Promise<{ schoolSlug: string }>;
 }) {
   const { schoolInfo, isLoading, setSchoolSlug } = useSchool();
   const router = useRouter();
 
   useEffect(() => {
-    setSchoolSlug(params.schoolSlug);
-  }, [params.schoolSlug, setSchoolSlug]);
+    params.then(({ schoolSlug }) => {
+      setSchoolSlug(schoolSlug);
+    });
+  }, [params, setSchoolSlug]);
 
   useEffect(() => {
     if (!isLoading && !schoolInfo) {
-      // School not found or inactive, redirect to main login
       router.push("/login");
     }
   }, [isLoading, schoolInfo, router]);

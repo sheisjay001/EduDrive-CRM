@@ -1,13 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from 'react';
-
-interface SchoolContextType {
-  schoolSlug: string | null;
-  schoolInfo: SchoolInfo | null;
-  isLoading: boolean;
-  setSchoolSlug: (slug: string) => void;
-}
+import { createContext, useContext, useEffect, useState, useRef } from "react";
 
 interface SchoolInfo {
   id: string;
@@ -16,49 +9,61 @@ interface SchoolInfo {
   logo_url?: string;
   primary_color?: string;
   secondary_color?: string;
+  subscription_plan?: string;
+}
+
+interface SchoolContextType {
+  schoolSlug: string;
+  schoolInfo: SchoolInfo | null;
+  isLoading: boolean;
+  setSchoolSlug: (slug: string) => void;
 }
 
 const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
 
 export function SchoolProvider({ children }: { children: React.ReactNode }) {
-  const [schoolSlug, setSchoolSlug] = useState<string | null>(null);
+  const [schoolSlug, setSchoolSlug] = useState("");
   const [schoolInfo, setSchoolInfo] = useState<SchoolInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const isMountedRef = useRef(true);
+
+  const fetchSchoolInfo = async (slug: string) => {
+    if (!isMountedRef.current) return;
+    
+    try {
+      const response = await fetch(`/api/v1/schools/slug/${slug}`);
+      if (response.ok && isMountedRef.current) {
+        const data = await response.json();
+        setSchoolInfo(data.school);
+      }
+    } catch (error) {
+      console.error("Failed to fetch school info:", error);
+    }
+  };
 
   useEffect(() => {
-    // Extract school slug from URL path
-    const pathParts = window.location.pathname.split('/').filter(Boolean);
-    const slugFromPath = pathParts[0] || null;
+    isMountedRef.current = true;
     
-    if (slugFromPath && slugFromPath !== 'login' && slugFromPath !== 'signup') {
+    // Extract school slug from URL path
+    const pathParts = window.location.pathname.split("/").filter(Boolean);
+    const slugFromPath = pathParts[0];
+
+    if (slugFromPath && slugFromPath !== "login" && slugFromPath !== "signup") {
       setSchoolSlug(slugFromPath);
     }
-    
+
     setIsLoading(false);
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   useEffect(() => {
     if (schoolSlug) {
-      // Fetch school information
       fetchSchoolInfo(schoolSlug);
     }
   }, [schoolSlug]);
-
-  const fetchSchoolInfo = async (slug: string) => {
-    try {
-      const response = await fetch(`/api/v1/schools/slug/${slug}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSchoolInfo(data.school);
-      } else {
-        // School not found or inactive
-        setSchoolInfo(null);
-      }
-    } catch (error) {
-      console.error('Failed to fetch school info:', error);
-      setSchoolInfo(null);
-    }
-  };
 
   return (
     <SchoolContext.Provider value={{ schoolSlug, schoolInfo, isLoading, setSchoolSlug }}>
@@ -70,7 +75,7 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
 export function useSchool() {
   const context = useContext(SchoolContext);
   if (context === undefined) {
-    throw new Error('useSchool must be used within a SchoolProvider');
+    throw new Error("useSchool must be used within a SchoolProvider");
   }
   return context;
 }

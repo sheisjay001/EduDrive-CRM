@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,6 @@ import { useSchool } from "@/lib/school-context";
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { schoolSlug, schoolInfo } = useSchool();
   
   const [email, setEmail] = useState("");
@@ -43,8 +42,8 @@ export default function LoginPage() {
       // Redirect to school-specific dashboard or default
       const redirectPath = schoolSlug ? `/${schoolSlug}/dashboard` : "/dashboard";
       router.push(redirectPath);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setIsLoading(false);
     }
@@ -103,7 +102,7 @@ export default function LoginPage() {
             </Button>
           </form>
           <div className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
-            <p>Don't have an account?{" "}
+            <p>Don&apos;t have an account?{" "}
               <a href={schoolSlug ? `/${schoolSlug}/signup` : "/signup"} className="text-blue-600 hover:underline">
                 Sign up
               </a>

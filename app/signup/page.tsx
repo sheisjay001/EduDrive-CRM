@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
-import { ArrowRight, UserPlus, Building2, Check } from "lucide-react";
+import { Building2, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -51,7 +51,6 @@ export default function SignupPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState(1);
   const form = useForm<SignupValues>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
@@ -98,8 +97,8 @@ export default function SignupPage() {
 
       // Redirect to dashboard
       router.push("/dashboard");
-    } catch (err: any) {
-      setError(err.message || "Unable to create account. Please try again.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Unable to create account. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -196,7 +195,7 @@ export default function SignupPage() {
                   {pricingPlans.map((plan) => (
                     <div
                       key={plan.id}
-                      onClick={() => form.setValue("subscriptionPlan", plan.id as any)}
+                      onClick={() => form.setValue("subscriptionPlan", plan.id as "basic" | "standard" | "enterprise")}
                       className={`cursor-pointer rounded-2xl border p-4 transition ${
                         selectedPlan === plan.id
                           ? "border-[#d9a441] bg-[#d9a441]/10"

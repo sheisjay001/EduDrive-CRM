@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
-import { ArrowRight, Check, CreditCard, ShieldCheck, UserRoundSearch, Zap, MessageSquare, HeadphonesIcon, GraduationCap } from "lucide-react";
+import { ArrowRight, Check, CreditCard, ShieldCheck, UserRoundSearch } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -254,7 +254,7 @@ export default function Home() {
           <div className="text-center mb-12">
             <h2 className="font-serif text-4xl text-white lg:text-5xl">Simple, Transparent Pricing</h2>
             <p className="mt-4 text-sm leading-7 text-[#c3d0e3]">
-              Choose the plan that fits your school's size and needs
+              Choose the plan that fits your school&apos;s size and needs
             </p>
           </div>
 

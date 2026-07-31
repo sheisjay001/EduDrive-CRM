@@ -11,6 +11,7 @@ const buttonVariants = cva(
         primary: "border-[#d9a441] bg-[#d9a441] px-4 py-2 text-[#14213d] shadow-[0_12px_30px_rgba(217,164,65,0.18)] hover:-translate-y-0.5",
         secondary: "border-white/10 bg-white/5 px-4 py-2 text-[#f6f1e8] hover:bg-white/10",
         ghost: "border-transparent px-3 py-2 text-[#8ea4c8] hover:bg-white/5 hover:text-white",
+        outline: "border-[#d9a441]/30 bg-transparent px-4 py-2 text-[#d9a441] hover:bg-[#d9a441]/10",
       },
       size: {
         default: "h-11",
