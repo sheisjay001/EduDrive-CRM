@@ -295,7 +295,7 @@ export default function Home() {
                   className={`mt-8 w-full ${
                     tier.popular
                       ? "bg-[#d9a441] text-white hover:bg-[#d9a441]/90"
-                      : "border border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10"
+                      : "border border-[#d9a441]/30 bg-[#d9a441]/10 text-[#d9a441] hover:bg-[#d9a441]/20"
                   }`}
                 >
                   {tier.cta}
