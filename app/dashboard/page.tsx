@@ -6,11 +6,23 @@ import { Card } from "@/components/ui/card";
 import { ActionHint, InsightFeed, KpiGrid, LoadingPanel, SectionTitle, TrendPanel } from "@/components/dashboard/ops-primitives";
 import { useDashboardQuery } from "@/hooks/use-crm-query";
 import { getUser } from "@/services/auth-storage";
+import { useSchool } from "@/lib/school-context";
+import { Copy, Check } from "lucide-react";
+import { useState } from "react";
 
 export default function DashboardPage() {
   const { data, isLoading } = useDashboardQuery();
   const user = getUser();
   const userRole = (user as { role?: string })?.role || "school_admin";
+  const { schoolSlug } = useSchool();
+  const [copied, setCopied] = useState(false);
+
+  const copySchoolLink = () => {
+    const link = `${window.location.origin}/${schoolSlug}`;
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const getDashboardContent = () => {
     switch (userRole) {
@@ -96,6 +108,29 @@ export default function DashboardPage() {
         <LoadingPanel />
       ) : (
         <>
+          {userRole === "school_admin" && schoolSlug && (
+            <Card className="mb-6 p-6 border-[#d9a441]/30 bg-[#d9a441]/5">
+              <SectionTitle
+                title="Your School Login Link"
+                description="Share this unique link with your staff and parents for them to access your school's portal"
+              />
+              <div className="mt-4 flex items-center gap-4">
+                <div className="flex-1 rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
+                  <code className="text-sm text-[#f9d28a]">
+                    {window.location.origin}/{schoolSlug}
+                  </code>
+                </div>
+                <button
+                  onClick={copySchoolLink}
+                  className="rounded-2xl border border-[#d9a441]/30 bg-[#d9a441]/10 px-4 py-3 text-[#d9a441] hover:bg-[#d9a441]/20 transition flex items-center gap-2"
+                >
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied ? "Copied!" : "Copy Link"}
+                </button>
+              </div>
+            </Card>
+          )}
+
           <KpiGrid items={dashboardContent.kpis} />
           
           {userRole === "school_admin" && (
