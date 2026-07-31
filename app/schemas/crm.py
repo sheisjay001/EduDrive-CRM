@@ -22,6 +22,7 @@ class ResetPasswordRequest(BaseModel):
 class AuthUser(BaseModel):
     id: str
     schoolId: str
+    schoolSlug: str = ""
     role: str
     fullName: str
     email: EmailStr

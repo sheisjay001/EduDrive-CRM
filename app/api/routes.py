@@ -50,8 +50,24 @@ from app.schemas.crm import (
     TicketDetailResponse,
 )
 from app.services import demo_data
+from app.api.activity_routes import router as activity_router
+from app.api.reminder_routes import router as reminder_router
+from app.api.calendar_routes import router as calendar_router
+from app.api.lifecycle_routes import router as lifecycle_router
+from app.api.payment_routes import router as payment_router
+from app.api.messaging_routes import router as messaging_router
+from app.api.frontdesk_routes import router as frontdesk_router
+from app.api.school_routes import router as school_router
 
 router = APIRouter()
+router.include_router(activity_router)
+router.include_router(reminder_router)
+router.include_router(calendar_router)
+router.include_router(lifecycle_router)
+router.include_router(payment_router)
+router.include_router(messaging_router)
+router.include_router(frontdesk_router)
+router.include_router(school_router)
 
 
 @router.post("/auth/login", response_model=AuthResponse)

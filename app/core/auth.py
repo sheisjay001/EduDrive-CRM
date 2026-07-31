@@ -54,16 +54,27 @@ def authenticate_user(email: str, password: str) -> Optional[AuthUser]:
         
         role = "school_admin"  # Default
         school_id = ""
+        school_slug = ""
         
         if role_response and role_response.data:
             role = role_response.data[0].get('role', 'school_admin')
             school_id = role_response.data[0].get('school_id', '')
+            
+            # Get school slug
+            if school_id:
+                try:
+                    school_response = supabase.table('schools').select('slug').eq('id', school_id).execute()
+                    if school_response.data:
+                        school_slug = school_response.data[0].get('slug', '')
+                except Exception as e:
+                    print(f"Error fetching school slug: {e}")
         
-        print(f"Authenticated user: {response.user.email} with role: {role}")
+        print(f"Authenticated user: {response.user.email} with role: {role}, school_slug: {school_slug}")
         
         return AuthUser(
             id=response.user.id,
             schoolId=school_id,
+            schoolSlug=school_slug,
             role=role,
             fullName=user_data.get('full_name', response.user.email.split('@')[0]),
             email=response.user.email,
@@ -192,7 +203,7 @@ def decode_refresh_token(token: str) -> AuthUser:
 
 
 def create_tokens_for_user(user: AuthUser) -> tuple[str, str]:
-    extra = {"schoolId": user.schoolId, "role": user.role, "fullName": user.fullName, "user_id": user.id}
+    extra = {"schoolId": user.schoolId, "schoolSlug": user.schoolSlug, "role": user.role, "fullName": user.fullName, "user_id": user.id}
     access_token = create_access_token(subject=user.email, extra=extra)
     refresh_token = create_refresh_token(subject=user.email, extra=extra)
     return access_token, refresh_token
