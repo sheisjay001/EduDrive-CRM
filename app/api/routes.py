@@ -9,6 +9,7 @@ from app.core.auth import (
     require_any_role,
     has_permission,
 )
+from app.database.session import get_supabase_client
 from app.schemas.crm import (
     AdmissionsResponse,
     AuthRequest,
