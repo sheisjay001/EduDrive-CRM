@@ -889,7 +889,104 @@ def delete_message_template(template_id: str, current_user: AuthUser = Depends(r
 
 @router.post("/messages/broadcast")
 def broadcast_message(payload: BroadcastRequest, current_user: AuthUser = Depends(require_any_role(["school_admin", "admissions_officer"]))) -> dict[str, str]:
-    return demo_data.broadcast_message(payload)
+    """Send broadcast message using configured messaging providers"""
+    supabase = get_supabase_client()
+    try:
+        # Get school communication settings
+        school_result = supabase.table('schools').select('communication_settings').eq('id', current_user.schoolId).execute()
+        
+        if not school_result.data:
+            raise HTTPException(status_code=404, detail="School not found")
+        
+        communication_settings = school_result.data[0].get('communication_settings', {})
+        
+        results = {"email": "skipped", "sms": "skipped", "whatsapp": "skipped"}
+        
+        # Send email if configured and email channel selected
+        if payload.channel in ['email', 'all'] and communication_settings.get('brevo_api_key'):
+            try:
+                import requests
+                url = "https://api.brevo.com/v3/smtp/email"
+                headers = {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "api-key": communication_settings['brevo_api_key']
+                }
+                
+                data = {
+                    "sender": {
+                        "name": "EduDrive CRM",
+                        "email": "noreply@edudrive.com"
+                    },
+                    "to": [{"email": recipient} for recipient in payload.recipients],
+                    "subject": payload.subject,
+                    "htmlContent": payload.message,
+                    "textContent": payload.message
+                }
+                
+                response = requests.post(url, json=data, headers=headers)
+                if response.status_code in [200, 201]:
+                    results["email"] = "sent"
+                else:
+                    results["email"] = "failed"
+            except Exception as e:
+                print(f"Email broadcast error: {e}")
+                results["email"] = "failed"
+        
+        # Send SMS if configured and SMS channel selected
+        if payload.channel in ['sms', 'all'] and communication_settings.get('termii_api_key'):
+            try:
+                import requests
+                url = "https://api.ng.termii.com/api/sms/send"
+                
+                for recipient in payload.recipients:
+                    data = {
+                        "api_key": communication_settings['termii_api_key'],
+                        "to": recipient,
+                        "from": "EduDrive",
+                        "sms": payload.message,
+                        "type": "plain",
+                        "channel": "dnd"
+                    }
+                    
+                    response = requests.post(url, json=data, headers={"Content-Type": "application/json"})
+                
+                results["sms"] = "sent"
+            except Exception as e:
+                print(f"SMS broadcast error: {e}")
+                results["sms"] = "failed"
+        
+        # Send WhatsApp if configured and WhatsApp channel selected
+        if payload.channel in ['whatsapp', 'all'] and communication_settings.get('whatsapp_phone_number_id'):
+            try:
+                import requests
+                phone_number_id = communication_settings['whatsapp_phone_number_id']
+                access_token = communication_settings['whatsapp_access_token']
+                url = f"https://graph.facebook.com/v17.0/{phone_number_id}/messages"
+                headers = {
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json"
+                }
+                
+                for recipient in payload.recipients:
+                    data = {
+                        "messaging_product": "whatsapp",
+                        "to": recipient,
+                        "type": "text",
+                        "text": {"body": payload.message}
+                    }
+                    
+                    requests.post(url, json=data, headers=headers)
+                
+                results["whatsapp"] = "sent"
+            except Exception as e:
+                print(f"WhatsApp broadcast error: {e}")
+                results["whatsapp"] = "failed"
+        
+        return results
+    except Exception as e:
+        print(f"Broadcast error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/tickets", response_model=HelpdeskResponse)
@@ -1077,18 +1174,6 @@ def report_detail(report_name: str, current_user: AuthUser = Depends(get_current
     )
 
 
-@router.get("/settings/overview", response_model=SettingsResponse)
-def settings(current_user: AuthUser = Depends(get_current_user)) -> SettingsResponse:
-    if not has_permission(current_user, "settings:view"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
-    supabase = get_supabase_client()
-    try:
-        result = supabase.table('schools').select('*').eq('id', current_user.schoolId).execute()
-        return demo_data.get_settings()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.patch("/settings")
 def update_settings(payload: dict, current_user: AuthUser = Depends(require_role("school_admin"))) -> dict:
     supabase = get_supabase_client()
@@ -1143,3 +1228,641 @@ def update_settings(payload: dict, current_user: AuthUser = Depends(require_role
     except Exception as e:
         print(f"Error updating settings: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/settings/terms")
+def get_terms(current_user: AuthUser = Depends(get_current_user)):
+    """Get all academic terms/sessions for the school"""
+    if not has_permission(current_user, "settings:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('terms').select('*').eq('school_id', current_user.schoolId).execute()
+        return {"terms": result.data or []}
+    except Exception as e:
+        print(f"Error fetching terms: {e}")
+        return {"terms": []}
+
+
+@router.post("/settings/terms")
+def create_term(payload: dict, current_user: AuthUser = Depends(require_role("school_admin"))):
+    """Create a new academic term/session"""
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('terms').insert({
+            'school_id': current_user.schoolId,
+            'name': payload.get('name'),
+            'start_date': payload.get('start_date'),
+            'end_date': payload.get('end_date'),
+            'is_active': payload.get('is_active', False)
+        }).execute()
+        return {"success": True, "term": result.data[0]}
+    except Exception as e:
+        print(f"Error creating term: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/settings/terms/{term_id}")
+def update_term(term_id: str, payload: dict, current_user: AuthUser = Depends(require_role("school_admin"))):
+    """Update an academic term/session"""
+    supabase = get_supabase_client()
+    try:
+        update_data = {}
+        if payload.get('name'):
+            update_data['name'] = payload['name']
+        if payload.get('start_date'):
+            update_data['start_date'] = payload['start_date']
+        if payload.get('end_date'):
+            update_data['end_date'] = payload['end_date']
+        if payload.get('is_active') is not None:
+            update_data['is_active'] = payload['is_active']
+        
+        result = supabase.table('terms').update(update_data).eq('id', term_id).eq('school_id', current_user.schoolId).execute()
+        return {"success": True, "term": result.data[0]}
+    except Exception as e:
+        print(f"Error updating term: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/settings/classes")
+def get_classes(current_user: AuthUser = Depends(get_current_user)):
+    """Get all classes for the school"""
+    if not has_permission(current_user, "settings:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('classes').select('*').eq('school_id', current_user.schoolId).execute()
+        return {"classes": result.data or []}
+    except Exception as e:
+        print(f"Error fetching classes: {e}")
+        return {"classes": []}
+
+
+@router.post("/settings/classes")
+def create_class(payload: dict, current_user: AuthUser = Depends(require_role("school_admin"))):
+    """Create a new class"""
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('classes').insert({
+            'school_id': current_user.schoolId,
+            'name': payload.get('name'),
+            'arm': payload.get('arm'),
+            'level_group': payload.get('level_group')
+        }).execute()
+        return {"success": True, "class": result.data[0]}
+    except Exception as e:
+        print(f"Error creating class: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/settings/classes/{class_id}")
+def update_class(class_id: str, payload: dict, current_user: AuthUser = Depends(require_role("school_admin"))):
+    """Update a class"""
+    supabase = get_supabase_client()
+    try:
+        update_data = {}
+        if payload.get('name'):
+            update_data['name'] = payload['name']
+        if payload.get('arm'):
+            update_data['arm'] = payload['arm']
+        if payload.get('level_group'):
+            update_data['level_group'] = payload['level_group']
+        
+        result = supabase.table('classes').update(update_data).eq('id', class_id).eq('school_id', current_user.schoolId).execute()
+        return {"success": True, "class": result.data[0]}
+    except Exception as e:
+        print(f"Error updating class: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/settings/classes/{class_id}")
+def delete_class(class_id: str, current_user: AuthUser = Depends(require_role("school_admin"))):
+    """Delete a class"""
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('classes').delete().eq('id', class_id).eq('school_id', current_user.schoolId).execute()
+        return {"success": True, "id": class_id}
+    except Exception as e:
+        print(f"Error deleting class: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/settings/users")
+def get_users(current_user: AuthUser = Depends(require_role("school_admin"))):
+    """Get all users for the school"""
+    supabase = get_supabase_client()
+    try:
+        # Get users with their roles
+        result = supabase.table('users').select('*').eq('school_id', current_user.schoolId).execute()
+        users = []
+        
+        for user in result.data or []:
+            # Get user role
+            role_result = supabase.table('user_roles').select('role').eq('user_id', user['id']).execute()
+            role = role_result.data[0]['role'] if role_result.data else 'school_admin'
+            
+            users.append({
+                "id": user['id'],
+                "full_name": user['full_name'],
+                "email": user['email'],
+                "role": role,
+                "status": user['status'],
+                "last_login_at": user.get('last_login_at')
+            })
+        
+        return {"users": users}
+    except Exception as e:
+        print(f"Error fetching users: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/settings/users")
+def create_user(payload: dict, current_user: AuthUser = Depends(require_role("school_admin"))):
+    """Create a new user"""
+    supabase = get_supabase_client()
+    try:
+        # Create user in Supabase Auth
+        auth_response = supabase.auth.sign_up({
+            'email': payload.get('email'),
+            'password': payload.get('password'),
+            'options': {
+                'data': {
+                    'full_name': payload.get('full_name'),
+                }
+            }
+        })
+        
+        if not auth_response.user:
+            raise HTTPException(status_code=400, detail="Failed to create user in auth")
+        
+        # Create user in database
+        user_result = supabase.table('users').insert({
+            'school_id': current_user.schoolId,
+            'full_name': payload.get('full_name'),
+            'email': payload.get('email'),
+            'password_hash': '',  # Password is managed by Supabase Auth
+            'status': 'active'
+        }).execute()
+        
+        # Create user role
+        supabase.table('user_roles').insert({
+            'user_id': auth_response.user.id,
+            'role': payload.get('role', 'school_admin'),
+            'school_id': current_user.schoolId
+        }).execute()
+        
+        return {"success": True, "user": user_result.data[0]}
+    except Exception as e:
+        print(f"Error creating user: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/settings/users/{user_id}")
+def update_user(user_id: str, payload: dict, current_user: AuthUser = Depends(require_role("school_admin"))):
+    """Update a user"""
+    supabase = get_supabase_client()
+    try:
+        update_data = {}
+        if payload.get('full_name'):
+            update_data['full_name'] = payload['full_name']
+        if payload.get('status'):
+            update_data['status'] = payload['status']
+        
+        if update_data:
+            result = supabase.table('users').update(update_data).eq('id', user_id).eq('school_id', current_user.schoolId).execute()
+        
+        # Update role if provided
+        if payload.get('role'):
+            supabase.table('user_roles').update({'role': payload['role']}).eq('user_id', user_id).execute()
+        
+        return {"success": True, "message": "User updated successfully"}
+    except Exception as e:
+        print(f"Error updating user: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/settings/users/{user_id}")
+def delete_user(user_id: str, current_user: AuthUser = Depends(require_role("school_admin"))):
+    """Delete a user"""
+    supabase = get_supabase_client()
+    try:
+        # Delete user role
+        supabase.table('user_roles').delete().eq('user_id', user_id).execute()
+        
+        # Delete user from database
+        supabase.table('users').delete().eq('id', user_id).eq('school_id', current_user.schoolId).execute()
+        
+        # Delete from Supabase Auth (requires admin privileges)
+        try:
+            supabase.auth.admin.delete_user(user_id)
+        except Exception as e:
+            print(f"Could not delete from auth: {e}")
+        
+        return {"success": True, "id": user_id}
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/payments/paystack/initialize")
+def initialize_paystack_payment(payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Initialize payment with Paystack"""
+    if not has_permission(current_user, "finance:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    
+    try:
+        import requests
+        from app.core.config import settings
+        
+        # Get Paystack secret key from school settings
+        supabase = get_supabase_client()
+        school_result = supabase.table('schools').select('payment_providers').eq('id', current_user.schoolId).execute()
+        
+        if not school_result.data:
+            raise HTTPException(status_code=404, detail="School not found")
+        
+        payment_providers = school_result.data[0].get('payment_providers', {})
+        secret_key = payment_providers.get('paystack_secret_key')
+        
+        if not secret_key:
+            raise HTTPException(status_code=400, detail="Paystack not configured")
+        
+        # Initialize payment
+        url = "https://api.paystack.co/transaction/initialize"
+        headers = {
+            "Authorization": f"Bearer {secret_key}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "email": payload.get('email'),
+            "amount": payload.get('amount') * 100,  # Convert to kobo
+            "reference": payload.get('reference'),
+            "metadata": {
+                "invoice_id": payload.get('invoice_id'),
+                "school_id": current_user.schoolId
+            },
+            "callback_url": f"{settings.frontend_url}/payments/paystack/callback"
+        }
+        
+        response = requests.post(url, json=data, headers=headers)
+        response_data = response.json()
+        
+        if response_data.get('status'):
+            return {
+                "success": True,
+                "authorization_url": response_data['data']['authorization_url'],
+                "reference": response_data['data']['reference']
+            }
+        else:
+            raise HTTPException(status_code=400, detail=response_data.get('message', 'Payment initialization failed'))
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error initializing Paystack payment: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/payments/paystack/webhook")
+def paystack_webhook(payload: dict):
+    """Handle Paystack webhook"""
+    try:
+        import hashlib
+        import hmac
+        from app.core.config import settings
+        
+        # Verify webhook signature
+        # In production, verify the signature using the secret key
+        
+        event = payload.get('event')
+        data = payload.get('data')
+        
+        if event == 'charge.success':
+            # Payment successful - update invoice
+            reference = data.get('reference')
+            amount = data.get('amount') / 100  # Convert from kobo
+            
+            supabase = get_supabase_client()
+            
+            # Find invoice by reference
+            invoice_result = supabase.table('invoices').select('*').eq('payment_reference', reference).execute()
+            
+            if invoice_result.data:
+                invoice = invoice_result.data[0]
+                
+                # Update payment
+                supabase.table('payments').insert({
+                    'invoice_id': invoice['id'],
+                    'amount': amount,
+                    'payment_method': 'paystack',
+                    'payment_reference': reference,
+                    'status': 'completed',
+                    'paid_at': datetime.now().isoformat()
+                }).execute()
+                
+                # Update invoice status
+                new_amount_paid = invoice['amount_paid'] + amount
+                new_status = 'paid' if new_amount_paid >= invoice['amount_due'] else 'part_paid'
+                
+                supabase.table('invoices').update({
+                    'amount_paid': new_amount_paid,
+                    'status': new_status
+                }).eq('id', invoice['id']).execute()
+        
+        return {"status": "success"}
+    except Exception as e:
+        print(f"Error processing Paystack webhook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/payments/flutterwave/initialize")
+def initialize_flutterwave_payment(payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Initialize payment with Flutterwave"""
+    if not has_permission(current_user, "finance:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    
+    try:
+        import requests
+        from app.core.config import settings
+        
+        # Get Flutterwave secret key from school settings
+        supabase = get_supabase_client()
+        school_result = supabase.table('schools').select('payment_providers').eq('id', current_user.schoolId).execute()
+        
+        if not school_result.data:
+            raise HTTPException(status_code=404, detail="School not found")
+        
+        payment_providers = school_result.data[0].get('payment_providers', {})
+        secret_key = payment_providers.get('flutterwave_secret_key')
+        
+        if not secret_key:
+            raise HTTPException(status_code=400, detail="Flutterwave not configured")
+        
+        # Initialize payment
+        url = "https://api.flutterwave.com/v3/payments"
+        headers = {
+            "Authorization": f"Bearer {secret_key}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "tx_ref": payload.get('reference'),
+            "amount": payload.get('amount'),
+            "currency": "NGN",
+            "email": payload.get('email'),
+            "payment_options": "card, banktransfer",
+            "meta": {
+                "invoice_id": payload.get('invoice_id'),
+                "school_id": current_user.schoolId
+            },
+            "redirect_url": f"{settings.frontend_url}/payments/flutterwave/callback"
+        }
+        
+        response = requests.post(url, json=data, headers=headers)
+        response_data = response.json()
+        
+        if response_data.get('status') == 'success':
+            return {
+                "success": True,
+                "payment_link": response_data['data']['link'],
+                "reference": response_data['data']['tx_ref']
+            }
+        else:
+            raise HTTPException(status_code=400, detail=response_data.get('message', 'Payment initialization failed'))
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error initializing Flutterwave payment: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/payments/flutterwave/webhook")
+def flutterwave_webhook(payload: dict):
+    """Handle Flutterwave webhook"""
+    try:
+        event = payload.get('event')
+        data = payload.get('data')
+        
+        if event == 'charge.completed' and data.get('status') == 'successful':
+            # Payment successful - update invoice
+            reference = data.get('tx_ref')
+            amount = data.get('amount')
+            
+            supabase = get_supabase_client()
+            
+            # Find invoice by reference
+            invoice_result = supabase.table('invoices').select('*').eq('payment_reference', reference).execute()
+            
+            if invoice_result.data:
+                invoice = invoice_result.data[0]
+                
+                # Update payment
+                supabase.table('payments').insert({
+                    'invoice_id': invoice['id'],
+                    'amount': amount,
+                    'payment_method': 'flutterwave',
+                    'payment_reference': reference,
+                    'status': 'completed',
+                    'paid_at': datetime.now().isoformat()
+                }).execute()
+                
+                # Update invoice status
+                new_amount_paid = invoice['amount_paid'] + amount
+                new_status = 'paid' if new_amount_paid >= invoice['amount_due'] else 'part_paid'
+                
+                supabase.table('invoices').update({
+                    'amount_paid': new_amount_paid,
+                    'status': new_status
+                }).eq('id', invoice['id']).execute()
+        
+        return {"status": "success"}
+    except Exception as e:
+        print(f"Error processing Flutterwave webhook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/messaging/email/send")
+def send_email(payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Send email using Brevo"""
+    if not has_permission(current_user, "messaging:send"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    
+    try:
+        import requests
+        
+        # Get Brevo API key from school settings
+        supabase = get_supabase_client()
+        school_result = supabase.table('schools').select('communication_settings').eq('id', current_user.schoolId).execute()
+        
+        if not school_result.data:
+            raise HTTPException(status_code=404, detail="School not found")
+        
+        communication_settings = school_result.data[0].get('communication_settings', {})
+        api_key = communication_settings.get('brevo_api_key')
+        
+        if not api_key:
+            raise HTTPException(status_code=400, detail="Brevo not configured")
+        
+        # Send email using Brevo API
+        url = "https://api.brevo.com/v3/smtp/email"
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "api-key": api_key
+        }
+        
+        data = {
+            "sender": {
+                "name": payload.get('sender_name', 'EduDrive CRM'),
+                "email": payload.get('sender_email', 'noreply@edudrive.com')
+            },
+            "to": [{"email": email} for email in payload.get('recipients', [])],
+            "subject": payload.get('subject'),
+            "htmlContent": payload.get('html_content'),
+            "textContent": payload.get('text_content', '')
+        }
+        
+        response = requests.post(url, json=data, headers=headers)
+        response_data = response.json()
+        
+        if response.status_code == 201 or response.status_code == 200:
+            return {"success": True, "message_id": response_data.get('messageId')}
+        else:
+            raise HTTPException(status_code=400, detail=response_data.get('message', 'Failed to send email'))
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error sending email: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/messaging/sms/send")
+def send_sms(payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Send SMS using Termii"""
+    if not has_permission(current_user, "messaging:send"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    
+    try:
+        import requests
+        
+        # Get Termii API key from school settings
+        supabase = get_supabase_client()
+        school_result = supabase.table('schools').select('communication_settings').eq('id', current_user.schoolId).execute()
+        
+        if not school_result.data:
+            raise HTTPException(status_code=404, detail="School not found")
+        
+        communication_settings = school_result.data[0].get('communication_settings', {})
+        api_key = communication_settings.get('termii_api_key')
+        
+        if not api_key:
+            raise HTTPException(status_code=400, detail="Termii not configured")
+        
+        # Send SMS using Termii API
+        url = "https://api.ng.termii.com/api/sms/send"
+        headers = {
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "api_key": api_key,
+            "to": payload.get('phone_number'),
+            "from": payload.get('sender_id', 'EduDrive'),
+            "sms": payload.get('message'),
+            "type": "plain",
+            "channel": "dnd"
+        }
+        
+        response = requests.post(url, json=data, headers=headers)
+        response_data = response.json()
+        
+        if response_data.get('message') == 'Successfully Sent':
+            return {"success": True, "message_id": response_data.get('message_id')}
+        else:
+            raise HTTPException(status_code=400, detail=response_data.get('message', 'Failed to send SMS'))
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error sending SMS: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/messaging/whatsapp/send")
+def send_whatsapp_message(payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Send WhatsApp message using WhatsApp Cloud API"""
+    if not has_permission(current_user, "messaging:send"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    
+    try:
+        import requests
+        
+        # Get WhatsApp credentials from school settings
+        supabase = get_supabase_client()
+        school_result = supabase.table('schools').select('communication_settings').eq('id', current_user.schoolId).execute()
+        
+        if not school_result.data:
+            raise HTTPException(status_code=404, detail="School not found")
+        
+        communication_settings = school_result.data[0].get('communication_settings', {})
+        phone_number_id = communication_settings.get('whatsapp_phone_number_id')
+        access_token = communication_settings.get('whatsapp_access_token')
+        
+        if not phone_number_id or not access_token:
+            raise HTTPException(status_code=400, detail="WhatsApp not configured")
+        
+        # Send WhatsApp message using Cloud API
+        url = f"https://graph.facebook.com/v17.0/{phone_number_id}/messages"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "messaging_product": "whatsapp",
+            "to": payload.get('phone_number'),
+            "type": "text",
+            "text": {
+                "body": payload.get('message')
+            }
+        }
+        
+        response = requests.post(url, json=data, headers=headers)
+        response_data = response.json()
+        
+        if response.status_code == 200:
+            return {"success": True, "message_id": response_data.get('messages', [{}])[0].get('id')}
+        else:
+            raise HTTPException(status_code=400, detail=response_data.get('error', {}).get('message', 'Failed to send WhatsApp message'))
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error sending WhatsApp message: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/audit-logs")
+def get_audit_logs(current_user: AuthUser = Depends(get_current_user)):
+    """Get audit logs for the school"""
+    if not has_permission(current_user, "audit:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('audit_logs').select('*').eq('school_id', current_user.schoolId).order('created_at', desc=True).limit(100).execute()
+        return {"logs": result.data or []}
+    except Exception as e:
+        print(f"Error fetching audit logs: {e}")
+        return {"logs": []}
+
+
+@router.get("/audit-logs/user/{user_id}")
+def get_user_audit_logs(user_id: str, current_user: AuthUser = Depends(get_current_user)):
+    """Get audit logs for a specific user"""
+    if not has_permission(current_user, "audit:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('audit_logs').select('*').eq('school_id', current_user.schoolId).eq('user_id', user_id).order('created_at', desc=True).limit(50).execute()
+        return {"logs": result.data or []}
+    except Exception as e:
+        print(f"Error fetching user audit logs: {e}")
+        return {"logs": []}
