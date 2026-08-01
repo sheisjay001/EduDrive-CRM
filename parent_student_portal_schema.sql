@@ -279,7 +279,7 @@ ORDER BY ur.role, u.email;
 SELECT 
     sa.id,
     sa.student_id,
-    s.name as student_name,
+    CONCAT(s.first_name, ' ', s.last_name) as student_name,
     sa.date,
     sa.status,
     sa.notes,
@@ -292,7 +292,7 @@ ORDER BY sa.date DESC;
 SELECT 
     sa.id,
     sa.student_id,
-    s.name as student_name,
+    CONCAT(s.first_name, ' ', s.last_name) as student_name,
     sa.title,
     sa.subject,
     sa.due_date,
