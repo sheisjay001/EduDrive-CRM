@@ -24,11 +24,11 @@ export default function FamiliesPage() {
   const canEdit = ["school_admin", "admissions_officer"].includes(userRole);
   const canDelete = userRole === "school_admin";
 
-  const handleEdit = (family: { id: string; familyName: string; primaryContact: string; email: string; phone: string; address: string; studentsCount: number }) => {
+  const handleEdit = (family: any) => {
     setEditingFamily(family.id);
     setEditFormData({
-      household_name: family.householdName,
-      billing_contact_parent_id: family.billingContactParentId,
+      household_name: family.householdName || family.familyName || "",
+      billing_contact_parent_id: family.billingContactParentId || "",
     });
   };
 
