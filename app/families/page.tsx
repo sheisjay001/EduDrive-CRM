@@ -24,7 +24,7 @@ export default function FamiliesPage() {
   const canEdit = ["school_admin", "admissions_officer"].includes(userRole);
   const canDelete = userRole === "school_admin";
 
-  const handleEdit = (family: any) => {
+  const handleEdit = (family: { id: string; familyName: string; primaryContact: string; email: string; phone: string; address: string; studentsCount: number }) => {
     setEditingFamily(family.id);
     setEditFormData({
       household_name: family.householdName,

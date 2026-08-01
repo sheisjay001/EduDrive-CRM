@@ -19,6 +19,14 @@ export default function SettingsPage() {
     primary_color: "",
     logo_url: "",
     school_type: "",
+    paystack_public_key: "",
+    paystack_secret_key: "",
+    flutterwave_public_key: "",
+    flutterwave_secret_key: "",
+    brevo_api_key: "",
+    termii_api_key: "",
+    whatsapp_phone_number_id: "",
+    whatsapp_access_token: "",
   } as Record<string, string>);
 
   const user = getUser();
@@ -31,6 +39,14 @@ export default function SettingsPage() {
         primary_color: data.groups[0]?.items[1]?.value || "",
         logo_url: data.groups[0]?.items[2]?.value || "",
         school_type: data.groups[0]?.items[3]?.value || "",
+        paystack_public_key: data.groups[1]?.items[0]?.value || "",
+        paystack_secret_key: data.groups[1]?.items[1]?.value || "",
+        flutterwave_public_key: data.groups[1]?.items[2]?.value || "",
+        flutterwave_secret_key: data.groups[1]?.items[3]?.value || "",
+        brevo_api_key: data.groups[2]?.items[0]?.value || "",
+        termii_api_key: data.groups[2]?.items[1]?.value || "",
+        whatsapp_phone_number_id: data.groups[2]?.items[2]?.value || "",
+        whatsapp_access_token: data.groups[2]?.items[3]?.value || "",
       });
       setIsEditing(true);
     }
