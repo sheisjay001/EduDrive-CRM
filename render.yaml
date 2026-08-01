@@ -8,6 +8,6 @@ services:
       - key: NEXT_PUBLIC_API_URL
         value: https://edudrive-crm-backend.onrender.com/api/v1
       - key: NEXT_PUBLIC_SUPABASE_URL
-        sync: false
+        value: https://zdnxmgevzhaqksgllyzg.supabase.co
       - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-        sync: false
+        value: sb_publishable_3-L5Hgfa6rq9FA0JpYwZWQ_PRrYEmJv
