@@ -123,7 +123,7 @@ async def get_school_by_slug(
     supabase = get_supabase_client()
     
     try:
-        result = supabase.rpc('get_school_by_slug', {'p_slug': slug}).execute()
+        result = supabase.table('schools').select('*').eq('slug', slug).execute()
         
         if not result.data:
             raise HTTPException(status_code=404, detail="School not found")
@@ -132,6 +132,7 @@ async def get_school_by_slug(
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Error fetching school by slug: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/validate/{slug}")
