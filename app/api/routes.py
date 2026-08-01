@@ -3997,3 +3997,658 @@ def get_student_statistics(current_user: AuthUser = Depends(get_current_user)):
     except Exception as e:
         print(f"Error fetching student statistics: {e}")
         return {"student_statistics": {"total_students": 0, "by_class": [], "gender_distribution": {}, "monthly_enrollments": {}}}
+
+
+@router.patch("/leads/{lead_id}/lost-reason")
+def update_lost_lead_reason(lead_id: str, payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Update lost lead reason when a lead is marked as lost"""
+    if not has_permission(current_user, "admissions:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        lost_reason = payload.get('lost_reason')
+        lost_notes = payload.get('lost_notes')
+        
+        # Update lead with lost reason
+        result = supabase.table('leads').update({
+            'stage': 'lost',
+            'lost_reason': lost_reason,
+            'lost_notes': lost_notes,
+            'lost_at': datetime.now().isoformat(),
+            'lost_by': current_user.id
+        }).eq('id', lead_id).eq('school_id', current_user.schoolId).execute()
+        
+        # Log the action
+        supabase.table('audit_logs').insert({
+            'school_id': current_user.schoolId,
+            'user_id': current_user.id,
+            'action': 'lead_lost',
+            'entity_type': 'lead',
+            'entity_id': lead_id,
+            'details': {
+                'lost_reason': lost_reason,
+                'lost_notes': lost_notes
+            },
+            'created_at': datetime.now().isoformat()
+        }).execute()
+        
+        return {"success": True, "lead": result.data[0]}
+    except Exception as e:
+        print(f"Error updating lost lead reason: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/leads/lost-reasons-summary")
+def get_lost_reasons_summary(current_user: AuthUser = Depends(get_current_user)):
+    """Get summary of lost lead reasons for analytics"""
+    if not has_permission(current_user, "admissions:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        # Get all lost leads
+        leads_result = supabase.table('leads').select('*').eq('school_id', current_user.schoolId).eq('stage', 'lost').execute()
+        lost_leads = leads_result.data or []
+        
+        # Count by lost reason
+        reason_counts = {}
+        for lead in lost_leads:
+            reason = lead.get('lost_reason', 'unknown')
+            reason_counts[reason] = reason_counts.get(reason, 0) + 1
+        
+        # Calculate percentage
+        total_lost = len(lost_leads)
+        reason_summary = []
+        for reason, count in reason_counts.items():
+            percentage = (count / total_lost * 100) if total_lost > 0 else 0
+            reason_summary.append({
+                "reason": reason,
+                "count": count,
+                "percentage": round(percentage, 2)
+            })
+        
+        # Sort by count (descending)
+        reason_summary.sort(key=lambda x: x['count'], reverse=True)
+        
+        return {
+            "lost_reasons_summary": reason_summary,
+            "total_lost_leads": total_lost
+        }
+    except Exception as e:
+        print(f"Error fetching lost reasons summary: {e}")
+        return {"lost_reasons_summary": [], "total_lost_leads": 0}
+
+
+@router.get("/helpdesk/analytics/resolution")
+def get_resolution_analytics(current_user: AuthUser = Depends(get_current_user)):
+    """Get resolution analytics for help desk"""
+    if not has_permission(current_user, "helpdesk:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import datetime, timedelta
+        
+        # Get all tickets for the school
+        tickets_result = supabase.table('helpdesk_tickets').select('*').eq('school_id', current_user.schoolId).execute()
+        tickets = tickets_result.data or []
+        
+        # Calculate resolution metrics
+        total_tickets = len(tickets)
+        resolved_tickets = [t for t in tickets if t['status'] == 'resolved']
+        closed_tickets = [t for t in tickets if t['status'] == 'closed']
+        
+        # Calculate average resolution time
+        resolution_times = []
+        for ticket in resolved_tickets:
+            if ticket.get('resolved_at') and ticket.get('created_at'):
+                try:
+                    created = datetime.fromisoformat(ticket['created_at'])
+                    resolved = datetime.fromisoformat(ticket['resolved_at'])
+                    resolution_times.append((resolved - created).total_seconds() / 3600)  # hours
+                except:
+                    pass
+        
+        avg_resolution_time = sum(resolution_times) / len(resolution_times) if resolution_times else 0
+        
+        # Calculate resolution rate
+        resolution_rate = (len(resolved_tickets) / total_tickets * 100) if total_tickets > 0 else 0
+        
+        # Get resolution by staff
+        staff_resolution = {}
+        for ticket in resolved_tickets:
+            assigned_to = ticket.get('assigned_to')
+            if assigned_to:
+                staff_resolution[assigned_to] = staff_resolution.get(assigned_to, 0) + 1
+        
+        # Get staff names
+        staff_names = {}
+        if staff_resolution:
+            staff_result = supabase.table('users').select('*').in_('id', list(staff_resolution.keys())).execute()
+            for staff in staff_result.data or []:
+                staff_names[staff['id']] = staff.get('name', 'Unknown')
+        
+        # Format staff resolution data
+        staff_resolution_data = []
+        for staff_id, count in staff_resolution.items():
+            staff_resolution_data.append({
+                "staff_id": staff_id,
+                "staff_name": staff_names.get(staff_id, 'Unknown'),
+                "resolved_count": count
+            })
+        
+        # Sort by resolved count (descending)
+        staff_resolution_data.sort(key=lambda x: x['resolved_count'], reverse=True)
+        
+        # Get resolution by priority
+        priority_resolution = {}
+        for ticket in resolved_tickets:
+            priority = ticket.get('priority', 'unknown')
+            priority_resolution[priority] = priority_resolution.get(priority, 0) + 1
+        
+        # Get resolution by category (if available)
+        category_resolution = {}
+        for ticket in resolved_tickets:
+            category = ticket.get('category', 'unknown')
+            category_resolution[category] = category_resolution.get(category, 0) + 1
+        
+        return {
+            "resolution_analytics": {
+                "total_tickets": total_tickets,
+                "resolved_tickets": len(resolved_tickets),
+                "closed_tickets": len(closed_tickets),
+                "resolution_rate": round(resolution_rate, 2),
+                "avg_resolution_time_hours": round(avg_resolution_time, 2),
+                "by_staff": staff_resolution_data,
+                "by_priority": priority_resolution,
+                "by_category": category_resolution
+            }
+        }
+    except Exception as e:
+        print(f"Error fetching resolution analytics: {e}")
+        return {"resolution_analytics": {"total_tickets": 0, "resolved_tickets": 0, "closed_tickets": 0, "resolution_rate": 0, "avg_resolution_time_hours": 0, "by_staff": [], "by_priority": {}, "by_category": {}}}
+
+
+@router.get("/analytics/attendance-trends")
+def get_attendance_trends(current_user: AuthUser = Depends(get_current_user)):
+    """Get attendance trend analysis"""
+    if not has_permission(current_user, "staff:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import datetime, timedelta
+        
+        # Get attendance for the last 6 months
+        six_months_ago = (datetime.now() - timedelta(days=180)).isoformat()
+        attendance_result = supabase.table('attendance').select('*').eq('school_id', current_user.schoolId).gte('date', six_months_ago).execute()
+        attendance_records = attendance_result.data or []
+        
+        # Calculate monthly attendance rates
+        monthly_attendance = {}
+        for i in range(6):
+            month_start = (datetime.now() - timedelta(days=30*i)).replace(day=1)
+            month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+            month_key = month_start.strftime('%Y-%m')
+            
+            month_records = [a for a in attendance_records if a.get('date') and month_start.isoformat() <= a['date'] <= month_end.isoformat()]
+            total_days = len(month_records)
+            present_days = len([a for a in month_records if a['status'] == 'present'])
+            attendance_rate = (present_days / total_days * 100) if total_days > 0 else 0
+            
+            monthly_attendance[month_key] = {
+                "total_days": total_days,
+                "present_days": present_days,
+                "attendance_rate": round(attendance_rate, 2)
+            }
+        
+        # Get attendance by staff
+        staff_attendance = {}
+        for record in attendance_records:
+            staff_id = record.get('staff_id')
+            if staff_id:
+                if staff_id not in staff_attendance:
+                    staff_attendance[staff_id] = {"total": 0, "present": 0}
+                staff_attendance[staff_id]["total"] += 1
+                if record['status'] == 'present':
+                    staff_attendance[staff_id]["present"] += 1
+        
+        # Get staff names
+        staff_names = {}
+        if staff_attendance:
+            staff_result = supabase.table('users').select('*').in_('id', list(staff_attendance.keys())).execute()
+            for staff in staff_result.data or []:
+                staff_names[staff['id']] = staff.get('name', 'Unknown')
+        
+        # Format staff attendance data
+        staff_attendance_data = []
+        for staff_id, data in staff_attendance.items():
+            attendance_rate = (data['present'] / data['total'] * 100) if data['total'] > 0 else 0
+            staff_attendance_data.append({
+                "staff_id": staff_id,
+                "staff_name": staff_names.get(staff_id, 'Unknown'),
+                "total_days": data['total'],
+                "present_days": data['present'],
+                "attendance_rate": round(attendance_rate, 2)
+            })
+        
+        return {
+            "attendance_trends": {
+                "monthly": monthly_attendance,
+                "by_staff": staff_attendance_data
+            }
+        }
+    except Exception as e:
+        print(f"Error fetching attendance trends: {e}")
+        return {"attendance_trends": {"monthly": {}, "by_staff": []}}
+
+
+@router.get("/analytics/parent-engagement")
+def get_parent_engagement_metrics(current_user: AuthUser = Depends(get_current_user)):
+    """Get parent engagement metrics"""
+    if not has_permission(current_user, "families:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import datetime, timedelta
+        
+        # Get all families for the school
+        families_result = supabase.table('families').select('*').eq('school_id', current_user.schoolId).execute()
+        families = families_result.data or []
+        
+        # Get communication history
+        thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
+        communications_result = supabase.table('communications').select('*').eq('school_id', current_user.schoolId).gte('sent_at', thirty_days_ago).execute()
+        communications = communications_result.data or []
+        
+        # Count communications by channel
+        channel_counts = {}
+        for comm in communications:
+            channel = comm.get('channel', 'unknown')
+            channel_counts[channel] = channel_counts.get(channel, 0) + 1
+        
+        # Get parent response rate (based on opened/clicked communications)
+        total_sent = len(communications)
+        opened_count = len([c for c in communications if c.get('opened_at')])
+        response_rate = (opened_count / total_sent * 100) if total_sent > 0 else 0
+        
+        # Get families with recent engagement
+        engaged_families = []
+        for family in families:
+            family_comms = [c for c in communications if c.get('family_id') == family['id']]
+            if family_comms:
+                engaged_families.append({
+                    "family_id": family['id'],
+                    "family_name": family.get('primary_contact_name', 'Unknown'),
+                    "communication_count": len(family_comms),
+                    "last_communication": max([c.get('sent_at') for c in family_comms])
+                })
+        
+        # Sort by communication count (descending)
+        engaged_families.sort(key=lambda x: x['communication_count'], reverse=True)
+        
+        return {
+            "parent_engagement": {
+                "total_families": len(families),
+                "total_communications": total_sent,
+                "opened_communications": opened_count,
+                "response_rate": round(response_rate, 2),
+                "by_channel": channel_counts,
+                "engaged_families": engaged_families[:20]  # Top 20
+            }
+        }
+    except Exception as e:
+        print(f"Error fetching parent engagement metrics: {e}")
+        return {"parent_engagement": {"total_families": 0, "total_communications": 0, "opened_communications": 0, "response_rate": 0, "by_channel": {}, "engaged_families": []}}
+
+
+@router.get("/reports/staff-performance")
+def get_staff_performance_report(current_user: AuthUser = Depends(get_current_user)):
+    """Get comprehensive staff performance report"""
+    if not has_permission(current_user, "staff:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        # Get performance summary for all staff
+        from datetime import datetime, timedelta
+        
+        staff_result = supabase.table('user_roles').select('*, users(*)').eq('school_id', current_user.schoolId).execute()
+        staff_members = staff_result.data or []
+        
+        performance_report = []
+        
+        for staff in staff_members:
+            staff_id = staff['user_id']
+            user = staff.get('users', {})
+            
+            # Attendance
+            thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
+            attendance_result = supabase.table('attendance').select('*').eq('staff_id', staff_id).eq('school_id', current_user.schoolId).gte('date', thirty_days_ago).execute()
+            attendance_records = attendance_result.data or []
+            
+            total_days = len(attendance_records)
+            present_days = len([a for a in attendance_records if a['status'] == 'present'])
+            attendance_rate = (present_days / total_days * 100) if total_days > 0 else 0
+            
+            # Help desk tickets
+            tickets_result = supabase.table('helpdesk_tickets').select('*').eq('assigned_to', staff_id).eq('school_id', current_user.schoolId).execute()
+            tickets = tickets_result.data or []
+            
+            total_tickets = len(tickets)
+            resolved_tickets = len([t for t in tickets if t['status'] == 'resolved'])
+            resolution_rate = (resolved_tickets / total_tickets * 100) if total_tickets > 0 else 0
+            
+            # SLA compliance
+            resolved_tickets_data = [t for t in tickets if t['status'] == 'resolved' and t.get('sla_deadline') and t.get('resolved_at')]
+            sla_compliant = 0
+            sla_total = 0
+            for ticket in resolved_tickets_data:
+                sla_total += 1
+                try:
+                    deadline = datetime.fromisoformat(ticket['sla_deadline'])
+                    resolved = datetime.fromisoformat(ticket['resolved_at'])
+                    if resolved <= deadline:
+                        sla_compliant += 1
+                except:
+                    pass
+            
+            sla_compliance_rate = (sla_compliant / sla_total * 100) if sla_total > 0 else 0
+            
+            # Calculate overall score
+            attendance_score = attendance_rate * 0.3
+            resolution_score = resolution_rate * 0.4
+            sla_score = sla_compliance_rate * 0.3
+            overall_score = attendance_score + resolution_score + sla_score
+            
+            performance_report.append({
+                "staff_id": staff_id,
+                "staff_name": user.get('name', 'Unknown'),
+                "staff_email": user.get('email', ''),
+                "role": staff.get('role', ''),
+                "attendance_rate": round(attendance_rate, 2),
+                "resolution_rate": round(resolution_rate, 2),
+                "sla_compliance_rate": round(sla_compliance_rate, 2),
+                "overall_score": round(overall_score, 2),
+                "grade": get_performance_grade(overall_score)
+            })
+        
+        # Sort by overall score (descending)
+        performance_report.sort(key=lambda x: x['overall_score'], reverse=True)
+        
+        return {
+            "staff_performance_report": performance_report,
+            "total_staff": len(performance_report),
+            "report_date": datetime.now().isoformat()
+        }
+    except Exception as e:
+        print(f"Error fetching staff performance report: {e}")
+        return {"staff_performance_report": [], "total_staff": 0, "report_date": datetime.now().isoformat()}
+
+
+@router.get("/reports/export/{report_type}")
+def export_report(report_type: str, current_user: AuthUser = Depends(get_current_user)):
+    """Export report data in CSV format"""
+    if not has_permission(current_user, "reports:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        import csv
+        from io import StringIO
+        from datetime import datetime
+        
+        data = []
+        headers = []
+        
+        if report_type == "students":
+            students_result = supabase.table('students').select('*, families(*), classes(*)').eq('school_id', current_user.schoolId).execute()
+            students = students_result.data or []
+            headers = ["ID", "Name", "Email", "Class", "Enrollment Date", "Status"]
+            for student in students:
+                data.append([
+                    student['id'],
+                    student.get('name', ''),
+                    student.get('email', ''),
+                    student.get('classes', {}).get('name', ''),
+                    student.get('enrollment_date', ''),
+                    student.get('status', '')
+                ])
+        
+        elif report_type == "families":
+            families_result = supabase.table('families').select('*').eq('school_id', current_user.schoolId).execute()
+            families = families_result.data or []
+            headers = ["ID", "Primary Contact", "Email", "Phone", "Address", "Children Count"]
+            for family in families:
+                data.append([
+                    family['id'],
+                    family.get('primary_contact_name', ''),
+                    family.get('email', ''),
+                    family.get('phone', ''),
+                    family.get('address', ''),
+                    family.get('children_count', 0)
+                ])
+        
+        elif report_type == "invoices":
+            invoices_result = supabase.table('invoices').select('*, families(*)').eq('school_id', current_user.schoolId).execute()
+            invoices = invoices_result.data or []
+            headers = ["Invoice Number", "Family", "Amount Due", "Amount Paid", "Status", "Due Date"]
+            for invoice in invoices:
+                data.append([
+                    invoice.get('invoice_number', ''),
+                    invoice.get('families', {}).get('primary_contact_name', ''),
+                    invoice.get('amount_due', 0),
+                    invoice.get('amount_paid', 0),
+                    invoice.get('status', ''),
+                    invoice.get('due_date', '')
+                ])
+        
+        elif report_type == "staff":
+            staff_result = supabase.table('user_roles').select('*, users(*)').eq('school_id', current_user.schoolId).execute()
+            staff = staff_result.data or []
+            headers = ["ID", "Name", "Email", "Role", "Created At"]
+            for s in staff:
+                data.append([
+                    s['user_id'],
+                    s.get('users', {}).get('name', ''),
+                    s.get('users', {}).get('email', ''),
+                    s.get('role', ''),
+                    s.get('users', {}).get('created_at', '')
+                ])
+        
+        else:
+            raise HTTPException(status_code=400, detail="Invalid report type")
+        
+        # Create CSV
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(headers)
+        writer.writerows(data)
+        
+        csv_content = output.getvalue()
+        
+        return {
+            "report_type": report_type,
+            "format": "csv",
+            "data": csv_content,
+            "generated_at": datetime.now().isoformat(),
+            "row_count": len(data)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error exporting report: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/analytics/enrollment-prediction")
+def get_enrollment_prediction(current_user: AuthUser = Depends(get_current_user)):
+    """Get enrollment prediction based on historical data"""
+    if not has_permission(current_user, "admissions:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import datetime, timedelta
+        
+        # Get enrollment data for last 12 months
+        twelve_months_ago = (datetime.now() - timedelta(days=365)).isoformat()
+        students_result = supabase.table('students').select('*').eq('school_id', current_user.schoolId).gte('enrollment_date', twelve_months_ago).execute()
+        students = students_result.data or []
+        
+        # Calculate monthly enrollments
+        monthly_enrollments = {}
+        for i in range(12):
+            month_start = (datetime.now() - timedelta(days=30*i)).replace(day=1)
+            month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+            month_key = month_start.strftime('%Y-%m')
+            
+            month_students = [s for s in students if s.get('enrollment_date') and month_start.isoformat() <= s['enrollment_date'] <= month_end.isoformat()]
+            monthly_enrollments[month_key] = len(month_students)
+        
+        # Calculate average monthly enrollment
+        avg_monthly = sum(monthly_enrollments.values()) / len(monthly_enrollments) if monthly_enrollments else 0
+        
+        # Calculate trend (simple linear regression)
+        months = list(range(len(monthly_enrollments)))
+        enrollments = list(monthly_enrollments.values())
+        
+        if len(months) > 1:
+            # Simple trend calculation
+            trend = (enrollments[-1] - enrollments[0]) / len(enrollments) if enrollments else 0
+        else:
+            trend = 0
+        
+        # Predict next 3 months
+        predictions = {}
+        for i in range(1, 4):
+            future_month = (datetime.now() + timedelta(days=30*i)).strftime('%Y-%m')
+            predicted = avg_monthly + (trend * i)
+            predictions[future_month] = max(0, round(predicted))
+        
+        # Get current leads in pipeline
+        leads_result = supabase.table('leads').select('*').eq('school_id', current_user.schoolId).not_.in_('stage', ['enrolled', 'lost']).execute()
+        pipeline_leads = leads_result.data or []
+        
+        return {
+            "enrollment_prediction": {
+                "historical_data": monthly_enrollments,
+                "average_monthly": round(avg_monthly, 2),
+                "trend": round(trend, 2),
+                "predictions": predictions,
+                "pipeline_leads": len(pipeline_leads),
+                "confidence": "medium"  # Simple prediction, not ML-based
+            }
+        }
+    except Exception as e:
+        print(f"Error fetching enrollment prediction: {e}")
+        return {"enrollment_prediction": {"historical_data": {}, "average_monthly": 0, "trend": 0, "predictions": {}, "pipeline_leads": 0, "confidence": "low"}}
+
+
+@router.get("/analytics/fee-forecasting")
+def get_fee_forecasting(current_user: AuthUser = Depends(get_current_user)):
+    """Get fee collection forecasting"""
+    if not has_permission(current_user, "finance:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import datetime, timedelta
+        
+        # Get invoices for last 6 months
+        six_months_ago = (datetime.now() - timedelta(days=180)).isoformat()
+        invoices_result = supabase.table('invoices').select('*').eq('school_id', current_user.schoolId).gte('created_at', six_months_ago).execute()
+        invoices = invoices_result.data or []
+        
+        # Calculate monthly collections
+        monthly_collections = {}
+        for i in range(6):
+            month_start = (datetime.now() - timedelta(days=30*i)).replace(day=1)
+            month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+            month_key = month_start.strftime('%Y-%m')
+            
+            month_invoices = [inv for inv in invoices if inv.get('created_at') and month_start.isoformat() <= inv['created_at'] <= month_end.isoformat()]
+            monthly_collections[month_key] = sum([inv.get('amount_paid', 0) for inv in month_invoices])
+        
+        # Calculate average monthly collection
+        avg_monthly = sum(monthly_collections.values()) / len(monthly_collections) if monthly_collections else 0
+        
+        # Get outstanding invoices
+        outstanding_result = supabase.table('invoices').select('*').eq('school_id', current_user.schoolId).in_('status', ['pending', 'part_paid']).execute()
+        outstanding_invoices = outstanding_result.data or []
+        
+        total_outstanding = sum([inv.get('amount_due', 0) - inv.get('amount_paid', 0) for inv in outstanding_invoices])
+        
+        # Predict next 3 months based on average + outstanding
+        predictions = {}
+        for i in range(1, 4):
+            future_month = (datetime.now() + timedelta(days=30*i)).strftime('%Y-%m')
+            predicted = avg_monthly + (total_outstanding / 3)  # Distribute outstanding over 3 months
+            predictions[future_month] = round(predicted, 2)
+        
+        return {
+            "fee_forecasting": {
+                "historical_collections": monthly_collections,
+                "average_monthly": round(avg_monthly, 2),
+                "total_outstanding": round(total_outstanding, 2),
+                "predictions": predictions,
+                "confidence": "medium"
+            }
+        }
+    except Exception as e:
+        print(f"Error fetching fee forecasting: {e}")
+        return {"fee_forecasting": {"historical_collections": {}, "average_monthly": 0, "total_outstanding": 0, "predictions": {}, "confidence": "low"}}
+
+
+@router.get("/analytics/student-retention")
+def get_student_retention_analysis(current_user: AuthUser = Depends(get_current_user)):
+    """Get student retention analysis"""
+    if not has_permission(current_user, "students:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import datetime, timedelta
+        
+        # Get all students
+        students_result = supabase.table('students').select('*').eq('school_id', current_user.schoolId).execute()
+        students = students_result.data or []
+        
+        # Calculate retention by year
+        retention_by_year = {}
+        for student in students:
+            enrollment_date = student.get('enrollment_date')
+            if enrollment_date:
+                try:
+                    year = datetime.fromisoformat(enrollment_date).year
+                    if year not in retention_by_year:
+                        retention_by_year[year] = {"enrolled": 0, "active": 0}
+                    retention_by_year[year]["enrolled"] += 1
+                    if student.get('status') == 'active':
+                        retention_by_year[year]["active"] += 1
+                except:
+                    pass
+        
+        # Calculate retention rates
+        retention_rates = {}
+        for year, data in retention_by_year.items():
+            retention_rate = (data['active'] / data['enrolled'] * 100) if data['enrolled'] > 0 else 0
+            retention_rates[year] = {
+                "enrolled": data['enrolled'],
+                "active": data['active'],
+                "retention_rate": round(retention_rate, 2)
+            }
+        
+        # Calculate overall retention rate
+        total_enrolled = sum([data['enrolled'] for data in retention_by_year.values()])
+        total_active = sum([data['active'] for data in retention_by_year.values()])
+        overall_retention = (total_active / total_enrolled * 100) if total_enrolled > 0 else 0
+        
+        # Get inactive students (for analysis)
+        inactive_students = [s for s in students if s.get('status') == 'inactive']
+        
+        return {
+            "student_retention": {
+                "by_year": retention_rates,
+                "overall_retention_rate": round(overall_retention, 2),
+                "total_students": len(students),
+                "active_students": total_active,
+                "inactive_students": len(inactive_students),
+                "retention_trend": "stable"  # Simple assessment
+            }
+        }
+    except Exception as e:
+        print(f"Error fetching student retention analysis: {e}")
+        return {"student_retention": {"by_year": {}, "overall_retention_rate": 0, "total_students": 0, "active_students": 0, "inactive_students": 0, "retention_trend": "unknown"}}
