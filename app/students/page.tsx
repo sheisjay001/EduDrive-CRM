@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { DataTable, LoadingPanel } from "@/components/dashboard/ops-primitives";
 import { Upload, Plus } from "lucide-react";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
+
 export default function StudentsPage() {
   const [students, setStudents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -23,7 +25,7 @@ export default function StudentsPage() {
     formData.append('file', file);
 
     try {
-      const response = await fetch('/api/v1/students/import/csv', {
+      const response = await fetch(`${API_URL}/students/import/csv`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -36,9 +38,11 @@ export default function StudentsPage() {
         alert(`Successfully imported ${result.students_created} students`);
         // Refresh students list
       } else {
-        alert('Failed to import students');
+        const error = await response.json();
+        alert(`Failed to import students: ${error.detail || 'Unknown error'}`);
       }
     } catch (error) {
+      console.error('Error importing students:', error);
       alert('Error importing students');
     } finally {
       setIsImporting(false);
