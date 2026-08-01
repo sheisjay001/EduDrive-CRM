@@ -82,47 +82,58 @@ CREATE INDEX IF NOT EXISTS idx_student_assignments_school_id ON student_assignme
 DO $$
 DECLARE
     school_id UUID;
+    parent1_id UUID;
+    parent2_id UUID;
+    student1_id UUID;
+    student2_id UUID;
 BEGIN
     SELECT id INTO school_id FROM schools LIMIT 1;
     
     IF school_id IS NULL THEN
         RAISE NOTICE 'No school found. Please create a school first.';
     ELSE
-        -- Parent User 1 Role Assignment
-        INSERT INTO user_roles (user_id, role, school_id, created_at)
-        VALUES (
-            'a1b2c3d4-e5f6-7890-abcd-ef1234567890', -- parent1@edudrive.demo (replace with actual user_id)
-            'parent',
-            school_id,
-            NOW()
-        ) ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role, school_id = EXCLUDED.school_id;
+        -- Get actual user IDs from auth.users table
+        SELECT id INTO parent1_id FROM auth.users WHERE email = 'parent1@edudrive.demo' LIMIT 1;
+        SELECT id INTO parent2_id FROM auth.users WHERE email = 'parent2@edudrive.demo' LIMIT 1;
+        SELECT id INTO student1_id FROM auth.users WHERE email = 'student1@edudrive.demo' LIMIT 1;
+        SELECT id INTO student2_id FROM auth.users WHERE email = 'student2@edudrive.demo' LIMIT 1;
         
-        -- Parent User 2 Role Assignment
-        INSERT INTO user_roles (user_id, role, school_id, created_at)
-        VALUES (
-            'b2c3d4e5-f6a7-8901-bcde-f12345678901', -- parent2@edudrive.demo (replace with actual user_id)
-            'parent',
-            school_id,
-            NOW()
-        ) ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role, school_id = EXCLUDED.school_id;
+        -- Only assign roles if users exist
+        IF parent1_id IS NOT NULL THEN
+            INSERT INTO user_roles (user_id, role, school_id, created_at)
+            VALUES (parent1_id, 'parent', school_id, NOW())
+            ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role, school_id = EXCLUDED.school_id;
+            RAISE NOTICE 'Assigned parent role to parent1@edudrive.demo';
+        ELSE
+            RAISE NOTICE 'User parent1@edudrive.demo not found. Please create user first in Supabase Dashboard.';
+        END IF;
         
-        -- Student User 1 Role Assignment
-        INSERT INTO user_roles (user_id, role, school_id, created_at)
-        VALUES (
-            'c3d4e5f6-a7b8-9012-cdef-123456789012', -- student1@edudrive.demo (replace with actual user_id)
-            'student',
-            school_id,
-            NOW()
-        ) ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role, school_id = EXCLUDED.school_id;
+        IF parent2_id IS NOT NULL THEN
+            INSERT INTO user_roles (user_id, role, school_id, created_at)
+            VALUES (parent2_id, 'parent', school_id, NOW())
+            ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role, school_id = EXCLUDED.school_id;
+            RAISE NOTICE 'Assigned parent role to parent2@edudrive.demo';
+        ELSE
+            RAISE NOTICE 'User parent2@edudrive.demo not found. Please create user first in Supabase Dashboard.';
+        END IF;
         
-        -- Student User 2 Role Assignment
-        INSERT INTO user_roles (user_id, role, school_id, created_at)
-        VALUES (
-            'd4e5f6a7-b8c9-0123-def0-234567890123', -- student2@edudrive.demo (replace with actual user_id)
-            'student',
-            school_id,
-            NOW()
-        ) ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role, school_id = EXCLUDED.school_id;
+        IF student1_id IS NOT NULL THEN
+            INSERT INTO user_roles (user_id, role, school_id, created_at)
+            VALUES (student1_id, 'student', school_id, NOW())
+            ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role, school_id = EXCLUDED.school_id;
+            RAISE NOTICE 'Assigned student role to student1@edudrive.demo';
+        ELSE
+            RAISE NOTICE 'User student1@edudrive.demo not found. Please create user first in Supabase Dashboard.';
+        END IF;
+        
+        IF student2_id IS NOT NULL THEN
+            INSERT INTO user_roles (user_id, role, school_id, created_at)
+            VALUES (student2_id, 'student', school_id, NOW())
+            ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role, school_id = EXCLUDED.school_id;
+            RAISE NOTICE 'Assigned student role to student2@edudrive.demo';
+        ELSE
+            RAISE NOTICE 'User student2@edudrive.demo not found. Please create user first in Supabase Dashboard.';
+        END IF;
         
         RAISE NOTICE 'Parent and student roles assigned. School ID: %', school_id;
     END IF;
@@ -136,37 +147,58 @@ END $$;
 DO $$
 DECLARE
     school_id UUID;
-    demo_student1_id UUID := 'c3d4e5f6-a7b8-9012-cdef-123456789012';
-    demo_student2_id UUID := 'd4e5f6a7-b8c9-0123-def0-234567890123';
+    student1_id UUID;
+    student2_id UUID;
 BEGIN
     SELECT id INTO school_id FROM schools LIMIT 1;
+    SELECT id INTO student1_id FROM auth.users WHERE email = 'student1@edudrive.demo' LIMIT 1;
+    SELECT id INTO student2_id FROM auth.users WHERE email = 'student2@edudrive.demo' LIMIT 1;
     
     IF school_id IS NOT NULL THEN
-        -- Sample Student Attendance Records
-        INSERT INTO student_attendance (student_id, date, status, notes, recorded_by, school_id)
-        VALUES
-            (demo_student1_id, CURRENT_DATE - INTERVAL '5 days', 'present', NULL, demo_student1_id, school_id),
-            (demo_student1_id, CURRENT_DATE - INTERVAL '4 days', 'present', NULL, demo_student1_id, school_id),
-            (demo_student1_id, CURRENT_DATE - INTERVAL '3 days', 'late', 'Arrived 15 minutes late', demo_student1_id, school_id),
-            (demo_student1_id, CURRENT_DATE - INTERVAL '2 days', 'present', NULL, demo_student1_id, school_id),
-            (demo_student1_id, CURRENT_DATE - INTERVAL '1 day', 'absent', 'Sick leave', demo_student1_id, school_id),
-            (demo_student2_id, CURRENT_DATE - INTERVAL '5 days', 'present', NULL, demo_student2_id, school_id),
-            (demo_student2_id, CURRENT_DATE - INTERVAL '4 days', 'present', NULL, demo_student2_id, school_id),
-            (demo_student2_id, CURRENT_DATE - INTERVAL '3 days', 'present', NULL, demo_student2_id, school_id),
-            (demo_student2_id, CURRENT_DATE - INTERVAL '2 days', 'excused', 'Medical appointment', demo_student2_id, school_id),
-            (demo_student2_id, CURRENT_DATE - INTERVAL '1 day', 'present', NULL, demo_student2_id, school_id)
-        ON CONFLICT DO NOTHING;
+        -- Only insert sample data if students exist
+        IF student1_id IS NOT NULL THEN
+            -- Sample Student Attendance Records for Student 1
+            INSERT INTO student_attendance (student_id, date, status, notes, recorded_by, school_id)
+            VALUES
+                (student1_id, CURRENT_DATE - INTERVAL '5 days', 'present', NULL, student1_id, school_id),
+                (student1_id, CURRENT_DATE - INTERVAL '4 days', 'present', NULL, student1_id, school_id),
+                (student1_id, CURRENT_DATE - INTERVAL '3 days', 'late', 'Arrived 15 minutes late', student1_id, school_id),
+                (student1_id, CURRENT_DATE - INTERVAL '2 days', 'present', NULL, student1_id, school_id),
+                (student1_id, CURRENT_DATE - INTERVAL '1 day', 'absent', 'Sick leave', student1_id, school_id)
+            ON CONFLICT DO NOTHING;
+            
+            -- Sample Student Assignments for Student 1
+            INSERT INTO student_assignments (student_id, title, description, subject, due_date, status, assigned_by, school_id)
+            VALUES
+                (student1_id, 'Math Homework Chapter 5', 'Complete exercises 1-20 from Chapter 5', 'Mathematics', CURRENT_DATE + INTERVAL '3 days', 'pending', student1_id, school_id),
+                (student1_id, 'Science Project', 'Create a presentation on renewable energy', 'Science', CURRENT_DATE + INTERVAL '7 days', 'in_progress', student1_id, school_id),
+                (student1_id, 'English Essay', 'Write a 500-word essay on climate change', 'English', CURRENT_DATE - INTERVAL '2 days', 'completed', student1_id, school_id)
+            ON CONFLICT DO NOTHING;
+            
+            RAISE NOTICE 'Sample data inserted for student1@edudrive.demo';
+        END IF;
         
-        -- Sample Student Assignments
-        INSERT INTO student_assignments (student_id, title, description, subject, due_date, status, assigned_by, school_id)
-        VALUES
-            (demo_student1_id, 'Math Homework Chapter 5', 'Complete exercises 1-20 from Chapter 5', 'Mathematics', CURRENT_DATE + INTERVAL '3 days', 'pending', demo_student1_id, school_id),
-            (demo_student1_id, 'Science Project', 'Create a presentation on renewable energy', 'Science', CURRENT_DATE + INTERVAL '7 days', 'in_progress', demo_student1_id, school_id),
-            (demo_student1_id, 'English Essay', 'Write a 500-word essay on climate change', 'English', CURRENT_DATE - INTERVAL '2 days', 'completed', demo_student1_id, school_id),
-            (demo_student2_id, 'History Report', 'Research and write about World War II', 'History', CURRENT_DATE + INTERVAL '5 days', 'pending', demo_student2_id, school_id),
-            (demo_student2_id, 'Math Quiz Preparation', 'Study for upcoming algebra quiz', 'Mathematics', CURRENT_DATE + INTERVAL '2 days', 'in_progress', demo_student2_id, school_id),
-            (demo_student2_id, 'Geography Map Assignment', 'Label countries on world map', 'Geography', CURRENT_DATE - INTERVAL '1 day', 'completed', demo_student2_id, school_id)
-        ON CONFLICT DO NOTHING;
+        IF student2_id IS NOT NULL THEN
+            -- Sample Student Attendance Records for Student 2
+            INSERT INTO student_attendance (student_id, date, status, notes, recorded_by, school_id)
+            VALUES
+                (student2_id, CURRENT_DATE - INTERVAL '5 days', 'present', NULL, student2_id, school_id),
+                (student2_id, CURRENT_DATE - INTERVAL '4 days', 'present', NULL, student2_id, school_id),
+                (student2_id, CURRENT_DATE - INTERVAL '3 days', 'present', NULL, student2_id, school_id),
+                (student2_id, CURRENT_DATE - INTERVAL '2 days', 'excused', 'Medical appointment', student2_id, school_id),
+                (student2_id, CURRENT_DATE - INTERVAL '1 day', 'present', NULL, student2_id, school_id)
+            ON CONFLICT DO NOTHING;
+            
+            -- Sample Student Assignments for Student 2
+            INSERT INTO student_assignments (student_id, title, description, subject, due_date, status, assigned_by, school_id)
+            VALUES
+                (student2_id, 'History Report', 'Research and write about World War II', 'History', CURRENT_DATE + INTERVAL '5 days', 'pending', student2_id, school_id),
+                (student2_id, 'Math Quiz Preparation', 'Study for upcoming algebra quiz', 'Mathematics', CURRENT_DATE + INTERVAL '2 days', 'in_progress', student2_id, school_id),
+                (student2_id, 'Geography Map Assignment', 'Label countries on world map', 'Geography', CURRENT_DATE - INTERVAL '1 day', 'completed', student2_id, school_id)
+            ON CONFLICT DO NOTHING;
+            
+            RAISE NOTICE 'Sample data inserted for student2@edudrive.demo';
+        END IF;
         
         RAISE NOTICE 'Sample data inserted for parent and student portals';
     END IF;
@@ -242,17 +274,18 @@ STUDENT USERS:
   Password: Student@123
   User Metadata: {"full_name": "Sarah Student"}
 
-STEP 2: Get User IDs
-Run this query to get the actual user IDs:
-SELECT id, email FROM auth.users WHERE email LIKE '%@edudrive.demo';
+STEP 2: Run this script in Supabase SQL Editor
+The script now automatically fetches user IDs from auth.users table, so no manual ID replacement is needed.
 
-STEP 3: Update User IDs in this script
-Replace the placeholder user IDs in the role assignment section with the actual IDs from step 2.
+STEP 3: Verify Results
+Check the notice messages to confirm:
+- Tables were created successfully
+- Roles were assigned to existing users
+- Sample data was inserted
 
-STEP 4: Run this script in Supabase SQL Editor
-Execute the entire script to create tables and assign roles.
-
-STEP 5: Test Login
+STEP 4: Test Login
 - Parent Login: /parent-login
 - Student Login: /student-login
+
+NOTE: If users don't exist, the script will skip role assignment and show helpful notices.
 */
