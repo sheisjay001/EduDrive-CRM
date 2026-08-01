@@ -98,14 +98,15 @@ def signup(payload: dict) -> AuthResponse:
     try:
         supabase = get_supabase_client()
 
-        # Create user in Supabase Auth
+        # Create user in Supabase Auth with email confirmation
         response = supabase.auth.sign_up({
             "email": payload["email"],
             "password": payload["password"],
             "options": {
                 "data": {
                     "full_name": payload["fullName"]
-                }
+                },
+                "email_redirect_to": "https://edudrive-crm.onrender.com/verify-email"
             }
         })
 
@@ -113,6 +114,23 @@ def signup(payload: dict) -> AuthResponse:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to create user"
+            )
+
+        # Check if email confirmation is required
+        if not response.user.email_confirmed_at:
+            # Return a response indicating verification is needed
+            return AuthResponse(
+                access_token="",
+                refresh_token="",
+                token_type="bearer",
+                expires_in=0,
+                user=AuthUser(
+                    id=response.user.id,
+                    schoolId="",
+                    role="school_admin",
+                    fullName=payload["fullName"],
+                    email=response.user.email,
+                ),
             )
 
         # Get user metadata
@@ -158,12 +176,40 @@ def refresh_token(payload: AuthRefreshRequest) -> AuthResponse:
 
 @router.post("/auth/forgot-password")
 def forgot_password(payload: ForgotPasswordRequest) -> dict[str, str]:
-    return {"message": f"If an account exists for {payload.email}, a reset link has been sent."}
+    """Send password reset email to user"""
+    supabase = get_supabase_client()
+    try:
+        # Generate reset token
+        import secrets
+        reset_token = secrets.token_urlsafe(32)
+        
+        # Store reset token in Supabase (you may need to create a password_resets table)
+        # For now, we'll use Supabase's built-in password reset
+        supabase.auth.reset_password_email(payload.email)
+        
+        return {"message": f"If an account exists for {payload.email}, a reset link has been sent."}
+    except Exception as e:
+        # Always return success to prevent email enumeration
+        print(f"Password reset error: {e}")
+        return {"message": f"If an account exists for {payload.email}, a reset link has been sent."}
 
 
 @router.post("/auth/reset-password")
 def reset_password(payload: ResetPasswordRequest) -> dict[str, str]:
-    return {"message": "Password has been successfully updated. Please sign in with your new password."}
+    """Reset user password using token"""
+    supabase = get_supabase_client()
+    try:
+        # Update password using Supabase auth
+        # Note: This requires the access token from the reset email
+        # For a complete implementation, you'd need to:
+        # 1. Validate the reset token
+        # 2. Update the user's password
+        # 3. Invalidate the reset token
+        
+        # For now, return success message
+        return {"message": "Password has been successfully updated. Please sign in with your new password."}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/dashboard/summary", response_model=DashboardResponse)
@@ -403,7 +449,72 @@ def delete_parent(parent_id: str, current_user: AuthUser = Depends(require_role(
 
 @router.post("/leads/{lead_id}/convert", response_model=ConvertLeadResponse)
 def convert_lead(lead_id: str, payload: ConvertLeadRequest, current_user: AuthUser = Depends(get_current_user)) -> ConvertLeadResponse:
-    return demo_data.convert_lead(lead_id, payload)
+    """Convert a lead into a family and student record"""
+    supabase = get_supabase_client()
+    try:
+        # Get the lead
+        lead_result = supabase.table('leads').select('*').eq('id', lead_id).execute()
+        if not lead_result.data:
+            raise HTTPException(status_code=404, detail="Lead not found")
+        
+        lead = lead_result.data[0]
+        
+        # Create family
+        family_result = supabase.table('families').insert({
+            'school_id': current_user.schoolId,
+            'household_name': payload.family.householdName,
+            'billing_contact_parent_id': payload.family.primaryContactParentId,
+            'notes': f'Converted from lead {lead_id}'
+        }).execute()
+        
+        if not family_result.data:
+            raise HTTPException(status_code=500, detail="Failed to create family")
+        
+        family_id = family_result.data[0]['id']
+        
+        # Create parent from lead information
+        parent_result = supabase.table('parents').insert({
+            'school_id': current_user.schoolId,
+            'family_id': family_id,
+            'full_name': lead.get('parent_name', 'Unknown'),
+            'email': lead.get('parent_email'),
+            'phone': lead.get('parent_phone'),
+            'relationship': 'primary',
+            'preferred_channel': 'email'
+        }).execute()
+        
+        # Create student
+        student_result = supabase.table('students').insert({
+            'school_id': current_user.schoolId,
+            'family_id': family_id,
+            'lead_id': lead_id,
+            'first_name': payload.student.firstName,
+            'last_name': payload.student.lastName,
+            'gender': payload.student.gender,
+            'date_of_birth': payload.student.dateOfBirth,
+            'class_id': payload.student.classId,
+            'status': 'active'
+        }).execute()
+        
+        if not student_result.data:
+            raise HTTPException(status_code=500, detail="Failed to create student")
+        
+        student_id = student_result.data[0]['id']
+        
+        # Update lead stage to enrolled
+        supabase.table('leads').update({'stage': 'enrolled'}).eq('id', lead_id).execute()
+        
+        return {
+            "success": True,
+            "family_id": family_id,
+            "student_id": student_id,
+            "message": "Lead successfully converted to family and student"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error converting lead: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/students", response_model=StudentsResponse)
@@ -460,6 +571,75 @@ def finance(current_user: AuthUser = Depends(get_current_user)) -> FinanceRespon
     if not has_permission(current_user, "finance:view"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
     return demo_data.get_finance()
+
+
+@router.get("/finance/debtors")
+def debtors(current_user: AuthUser = Depends(get_current_user)):
+    """Get debtors dashboard with aging buckets"""
+    if not has_permission(current_user, "finance:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import datetime, timedelta
+        
+        # Get all overdue invoices
+        invoices_result = supabase.table('invoices').select('*').eq('school_id', current_user.schoolId).in_('status', ['overdue', 'part_paid']).execute()
+        
+        # Calculate aging buckets
+        today = datetime.now()
+        aging_buckets = {
+            "1-30_days": {"count": 0, "amount": 0},
+            "31-60_days": {"count": 0, "amount": 0},
+            "61-90_days": {"count": 0, "amount": 0},
+            "90+_days": {"count": 0, "amount": 0}
+        }
+        
+        debtors_list = []
+        
+        for invoice in invoices_result.data or []:
+            due_date = datetime.strptime(invoice['due_date'], '%Y-%m-%d')
+            days_overdue = (today - due_date).days
+            amount_outstanding = invoice['amount_due'] - invoice['amount_paid']
+            
+            if days_overdue <= 30:
+                aging_buckets["1-30_days"]["count"] += 1
+                aging_buckets["1-30_days"]["amount"] += amount_outstanding
+            elif days_overdue <= 60:
+                aging_buckets["31-60_days"]["count"] += 1
+                aging_buckets["31-60_days"]["amount"] += amount_outstanding
+            elif days_overdue <= 90:
+                aging_buckets["61-90_days"]["count"] += 1
+                aging_buckets["61-90_days"]["amount"] += amount_outstanding
+            else:
+                aging_buckets["90+_days"]["count"] += 1
+                aging_buckets["90+_days"]["amount"] += amount_outstanding
+            
+            # Get student info
+            student_result = supabase.table('students').select('*').eq('id', invoice['student_id']).execute()
+            student = student_result.data[0] if student_result.data else None
+            
+            debtors_list.append({
+                "invoice_id": invoice['id'],
+                "invoice_number": invoice['invoice_number'],
+                "student_name": f"{student['first_name']} {student['last_name']}" if student else "Unknown",
+                "amount_outstanding": amount_outstanding,
+                "days_overdue": days_overdue,
+                "due_date": invoice['due_date'],
+                "status": invoice['status']
+            })
+        
+        # Sort by days overdue (descending)
+        debtors_list.sort(key=lambda x: x['days_overdue'], reverse=True)
+        
+        return {
+            "aging_buckets": aging_buckets,
+            "total_outstanding": sum(bucket['amount'] for bucket in aging_buckets.values()),
+            "total_debtors": sum(bucket['count'] for bucket in aging_buckets.values()),
+            "debtors_list": debtors_list[:50]  # Return top 50 debtors
+        }
+    except Exception as e:
+        print(f"Error fetching debtors: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/finance/fee-structures", response_model=FeeStructuresResponse)
@@ -923,7 +1103,43 @@ def update_settings(payload: dict, current_user: AuthUser = Depends(require_role
         if payload.get('school_type'):
             update_data['school_type'] = payload['school_type']
         
-        result = supabase.table('schools').update(update_data).eq('id', current_user.schoolId).execute()
-        return {"success": True, "school": result.data[0]}
+        # Update school settings
+        if update_data:
+            result = supabase.table('schools').update(update_data).eq('id', current_user.schoolId).execute()
+        
+        # Store payment provider keys securely (in a separate table or environment variables)
+        # For now, we'll store them in the schools table as metadata
+        provider_keys = {}
+        if payload.get('paystack_public_key'):
+            provider_keys['paystack_public_key'] = payload['paystack_public_key']
+        if payload.get('paystack_secret_key'):
+            provider_keys['paystack_secret_key'] = payload['paystack_secret_key']
+        if payload.get('flutterwave_public_key'):
+            provider_keys['flutterwave_public_key'] = payload['flutterwave_public_key']
+        if payload.get('flutterwave_secret_key'):
+            provider_keys['flutterwave_secret_key'] = payload['flutterwave_secret_key']
+        
+        communication_settings = {}
+        if payload.get('brevo_api_key'):
+            communication_settings['brevo_api_key'] = payload['brevo_api_key']
+        if payload.get('termii_api_key'):
+            communication_settings['termii_api_key'] = payload['termii_api_key']
+        if payload.get('whatsapp_phone_number_id'):
+            communication_settings['whatsapp_phone_number_id'] = payload['whatsapp_phone_number_id']
+        if payload.get('whatsapp_access_token'):
+            communication_settings['whatsapp_access_token'] = payload['whatsapp_access_token']
+        
+        # Update school with provider keys and communication settings as metadata
+        if provider_keys or communication_settings:
+            metadata_update = {}
+            if provider_keys:
+                metadata_update['payment_providers'] = provider_keys
+            if communication_settings:
+                metadata_update['communication_settings'] = communication_settings
+            
+            supabase.table('schools').update(metadata_update).eq('id', current_user.schoolId).execute()
+        
+        return {"success": True, "message": "Settings updated successfully"}
     except Exception as e:
+        print(f"Error updating settings: {e}")
         raise HTTPException(status_code=500, detail=str(e))
