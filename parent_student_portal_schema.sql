@@ -5,6 +5,37 @@
 -- TABLE CREATION
 -- ============================================
 
+-- Add user_id column to students table if it doesn't exist
+DO $$
+BEGIN
+    -- Add user_id column to students table if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'students' AND column_name = 'user_id'
+    ) THEN
+        ALTER TABLE students ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL;
+        RAISE NOTICE 'Added user_id column to students table';
+    END IF;
+    
+    -- Add email column to students table if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'students' AND column_name = 'email'
+    ) THEN
+        ALTER TABLE students ADD COLUMN email VARCHAR(150);
+        RAISE NOTICE 'Added email column to students table';
+    END IF;
+    
+    -- Add enrollment_date column to students table if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'students' AND column_name = 'enrollment_date'
+    ) THEN
+        ALTER TABLE students ADD COLUMN enrollment_date DATE;
+        RAISE NOTICE 'Added enrollment_date column to students table';
+    END IF;
+END $$;
+
 -- Student Attendance Table
 CREATE TABLE IF NOT EXISTS student_attendance (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
