@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useSchool } from "@/lib/school-context";
 
-export default function LoginPage() {
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
+
+export default function StudentLoginPage() {
   const router = useRouter();
-  const { schoolSlug, schoolInfo } = useSchool();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,7 +22,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/v1/auth/login", {
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -31,7 +31,12 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || "Login failed");
+        throw new Error(data.detail || "Student login failed");
+      }
+
+      // Check if user has student role
+      if (data.user.role !== "student") {
+        throw new Error("This login is for students only");
       }
 
       // Store tokens
@@ -39,31 +44,10 @@ export default function LoginPage() {
       localStorage.setItem("refresh_token", data.refresh_token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
-      // Role-based routing
-      const userRole = data.user.role;
-      let redirectPath = "/dashboard";
-      
-      if (userRole === "parent") {
-        redirectPath = "/parents";
-      } else if (userRole === "student") {
-        redirectPath = "/students";
-      } else if (userRole === "super_admin") {
-        redirectPath = "/dashboard/super-admin";
-      } else if (userRole === "school_admin") {
-        redirectPath = "/dashboard/school-admin";
-      } else if (userRole === "admissions_officer") {
-        redirectPath = "/dashboard/admissions";
-      } else if (userRole === "bursar") {
-        redirectPath = "/dashboard/bursar";
-      } else if (userRole === "teacher") {
-        redirectPath = "/dashboard/teacher";
-      } else if (userRole === "helpdesk_officer") {
-        redirectPath = "/dashboard/helpdesk";
-      }
-      
-      router.push(redirectPath);
+      // Redirect to student portal
+      router.push("/students");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : "Student login failed");
     } finally {
       setIsLoading(false);
     }
@@ -73,16 +57,11 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          {schoolInfo?.logo_url && (
-            <div className="flex justify-center mb-4">
-              <img src={schoolInfo.logo_url} alt={schoolInfo.name} className="h-16 w-auto" />
-            </div>
-          )}
-          <CardTitle className="text-2xl font-bold text-center">
-            {schoolInfo?.name || "EduDrive CRM"}
+          <CardTitle className="text-2xl font-bold text-center text-blue-700">
+            Student Portal
           </CardTitle>
           <CardDescription className="text-center">
-            Sign in to your account
+            Sign in to access your academic records
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -94,7 +73,7 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="name@example.com"
+                placeholder="student@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -117,23 +96,18 @@ export default function LoginPage() {
                 {error}
               </div>
             )}
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign In"}
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
+              {isLoading ? "Signing in..." : "Sign In as Student"}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
-            <p>Don&apos;t have an account?{" "}
-              <a href={schoolSlug ? `/${schoolSlug}/signup` : "/signup"} className="text-blue-600 hover:underline">
-                Sign up
-              </a>
-            </p>
-            <p className="mt-2">
-              <a href="/parent-login" className="text-blue-600 hover:underline">
-                Parent Portal
+            <p>
+              <a href="/login" className="text-blue-600 hover:underline">
+                Staff Login
               </a>
               {" | "}
-              <a href="/student-login" className="text-blue-600 hover:underline">
-                Student Portal
+              <a href="/parent-login" className="text-blue-600 hover:underline">
+                Parent Login
               </a>
             </p>
           </div>
