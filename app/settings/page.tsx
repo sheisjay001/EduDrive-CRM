@@ -19,7 +19,7 @@ export default function SettingsPage() {
     primary_color: "",
     logo_url: "",
     school_type: "",
-  });
+  } as Record<string, string>);
 
   const user = getUser();
   const userRole = (user as { role?: string })?.role || "school_admin";
@@ -27,10 +27,10 @@ export default function SettingsPage() {
   const handleEdit = () => {
     if (data) {
       setFormData({
-        name: data.school?.name || "",
-        primary_color: data.school?.primary_color || "",
-        logo_url: data.school?.logo_url || "",
-        school_type: data.school?.school_type || "",
+        name: data.groups[0]?.items[0]?.value || "",
+        primary_color: data.groups[0]?.items[1]?.value || "",
+        logo_url: data.groups[0]?.items[2]?.value || "",
+        school_type: data.groups[0]?.items[3]?.value || "",
       });
       setIsEditing(true);
     }

@@ -1,15 +1,57 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/shell/app-shell";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DataTable, KpiGrid, LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
 import { useFeeStructuresQuery, useFinanceQuery } from "@/hooks/use-crm-query";
+import { Edit, Trash2, Save, X } from "lucide-react";
+import { getUser } from "@/services/auth-storage";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
 export default function FinancePage() {
-  const { data, isLoading } = useFinanceQuery();
+  const { data, isLoading, refetch } = useFinanceQuery();
   const { data: feeData, isLoading: feeLoading } = useFeeStructuresQuery();
+  const [editingInvoice, setEditingInvoice] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState({});
+
+  const user = getUser();
+  const userRole = (user as { role?: string })?.role || "school_admin";
+  const canEdit = ["school_admin", "bursar"].includes(userRole);
+  const canDelete = userRole === "school_admin";
+
+  const handleEdit = (invoice: { id: string; student: string; term: string; amountDue: string; amountPaid: string; dueDate: string; status: string }) => {
+    setEditingInvoice(invoice.id);
+    setEditFormData({ amount_due: invoice.amountDue, status: invoice.status });
+  };
+
+  const handleSaveEdit = async (invoiceId: string) => {
+    try {
+      const response = await fetch(`${API_URL}/finance/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+        body: JSON.stringify(editFormData),
+      });
+      if (response.ok) { setEditingInvoice(null); refetch(); alert("Invoice updated"); }
+    } catch { alert("Error updating invoice"); }
+  };
+
+  const handleCancelEdit = () => { setEditingInvoice(null); setEditFormData({}); };
+
+  const handleDelete = async (invoiceId: string) => {
+    if (!confirm("Delete this invoice?")) return;
+    try {
+      const response = await fetch(`${API_URL}/finance/invoices/${invoiceId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+      });
+      if (response.ok) { refetch(); alert("Invoice deleted"); }
+    } catch { alert("Error deleting invoice"); }
+  };
 
   const kpis = [
     { label: "Total billed", value: data?.summary.totalBilled ?? "", change: "Term-wide billing volume", tone: "neutral" as const },
@@ -33,19 +75,40 @@ export default function FinancePage() {
             <DataTable
               title="Invoice desk"
               description="Recent invoices with payment posture and due-date context."
-              columns={["Invoice", "Student", "Term", "Amount due", "Amount paid", "Due date", "Status"]}
+              columns={["Invoice", "Student", "Term", "Amount due", "Amount paid", "Due date", "Status", "Actions"]}
               rows={data.invoices.map((invoice) => [
                 <Link key={`${invoice.id}-link`} href={`/finance/invoices/${invoice.id}`} className="font-medium text-[#d9a441] hover:underline">
                   {invoice.id}
                 </Link>,
                 invoice.student,
                 invoice.term,
-                invoice.amountDue,
+                editingInvoice === invoice.id ? (
+                  <input type="text" defaultValue={invoice.amountDue} onChange={(e) => setEditFormData({ ...editFormData, amount_due: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white" />
+                ) : (
+                  invoice.amountDue
+                ),
                 invoice.amountPaid,
                 invoice.dueDate,
-                <Badge key={`${invoice.id}-status`} tone={invoice.status === "Paid" ? "good" : invoice.status === "Overdue" ? "danger" : "warn"}>
-                  {invoice.status}
-                </Badge>,
+                editingInvoice === invoice.id ? (
+                  <input type="text" defaultValue={invoice.status} onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white" />
+                ) : (
+                  <Badge key={`${invoice.id}-status`} tone={invoice.status === "Paid" ? "good" : invoice.status === "Overdue" ? "danger" : "warn"}>
+                    {invoice.status}
+                  </Badge>
+                ),
+                <div key={`${invoice.id}-actions`} className="flex gap-2">
+                  {editingInvoice === invoice.id ? (
+                    <>
+                      <Button size="sm" onClick={() => handleSaveEdit(invoice.id)} className="bg-green-600 text-white hover:bg-green-700"><Save className="h-4 w-4" /></Button>
+                      <Button size="sm" onClick={handleCancelEdit} variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10"><X className="h-4 w-4" /></Button>
+                    </>
+                  ) : (
+                    <>
+                      {canEdit && <Button size="sm" onClick={() => handleEdit(invoice)} variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10"><Edit className="h-4 w-4" /></Button>}
+                      {canDelete && <Button size="sm" onClick={() => handleDelete(invoice.id)} variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10"><Trash2 className="h-4 w-4" /></Button>}
+                    </>
+                  )}
+                </div>,
               ])}
             />
             <div className="space-y-6">

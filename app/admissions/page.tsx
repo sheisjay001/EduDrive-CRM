@@ -47,7 +47,7 @@ export default function AdmissionsPage() {
     }
   };
 
-  const handleEdit = (lead: any) => {
+  const handleEdit = (lead: { id: string; childName: string; parentName: string; source: string; stage: string; classInterest: string; followUp: string }) => {
     setEditingLead(lead.id);
     setEditFormData({
       first_name: lead.childName?.split(" ")[0],

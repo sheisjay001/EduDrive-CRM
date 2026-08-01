@@ -57,7 +57,7 @@ export default function StudentsPage() {
     }
   };
 
-  const handleEdit = (student: any) => {
+  const handleEdit = (student: { id: string; first_name: string; last_name: string; admission_no?: string; gender?: string; date_of_birth?: string; class_id?: string; status?: string; family_id?: string }) => {
     setEditingStudent(student.id);
     setEditFormData({
       first_name: student.first_name,
@@ -160,7 +160,7 @@ export default function StudentsPage() {
           title="Student directory"
           description="An operations-ready directory for administration, finance, and classroom support."
           columns={["Student", "Class", "Guardian", "Attendance", "Behaviour", "Medical", "Actions"]}
-          rows={students.map((student: any) => [
+          rows={students.map((student: { id: string; first_name: string; last_name: string; class_id?: string; family_id?: string; status?: string }) => [
             editingStudent === student.id ? (
               <input
                 key="first_name"
