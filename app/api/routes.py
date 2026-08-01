@@ -3295,3 +3295,476 @@ def auto_assign_tickets(payload: dict, current_user: AuthUser = Depends(get_curr
     except Exception as e:
         print(f"Error auto-assigning tickets: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/helpdesk/tickets/workflow")
+def get_ticket_workflow(current_user: AuthUser = Depends(get_current_user)):
+    """Get the ticket workflow configuration"""
+    if not has_permission(current_user, "helpdesk:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        # Default workflow stages
+        workflow_stages = [
+            {"stage": "open", "label": "Open", "description": "New ticket created", "order": 1},
+            {"stage": "assigned", "label": "Assigned", "description": "Ticket assigned to staff", "order": 2},
+            {"stage": "in_progress", "label": "In Progress", "description": "Staff working on ticket", "order": 3},
+            {"stage": "pending", "label": "Pending", "description": "Waiting for customer response", "order": 4},
+            {"stage": "resolved", "label": "Resolved", "description": "Issue resolved", "order": 5},
+            {"stage": "closed", "label": "Closed", "description": "Ticket closed", "order": 6}
+        ]
+        
+        # Get custom workflow from school settings if exists
+        school_result = supabase.table('schools').select('*').eq('id', current_user.schoolId).execute()
+        if school_result.data:
+            school = school_result.data[0]
+            custom_workflow = school.get('metadata', {}).get('ticket_workflow')
+            if custom_workflow:
+                workflow_stages = custom_workflow
+        
+        return {"workflow_stages": workflow_stages}
+    except Exception as e:
+        print(f"Error fetching workflow: {e}")
+        return {"workflow_stages": []}
+
+
+@router.patch("/helpdesk/tickets/{ticket_id}/status")
+def update_ticket_status(ticket_id: str, payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Update ticket status with workflow validation"""
+    if not has_permission(current_user, "helpdesk:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        new_status = payload.get('status')
+        resolution_notes = payload.get('resolution_notes')
+        
+        # Validate status transition
+        valid_transitions = {
+            'open': ['assigned', 'closed'],
+            'assigned': ['in_progress', 'closed'],
+            'in_progress': ['pending', 'resolved', 'closed'],
+            'pending': ['in_progress', 'resolved', 'closed'],
+            'resolved': ['closed', 'in_progress'],
+            'closed': ['open']
+        }
+        
+        # Get current ticket
+        ticket_result = supabase.table('helpdesk_tickets').select('*').eq('id', ticket_id).eq('school_id', current_user.schoolId).execute()
+        if not ticket_result.data:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+        
+        current_status = ticket_result.data[0].get('status')
+        
+        # Check if transition is valid
+        if new_status not in valid_transitions.get(current_status, []):
+            raise HTTPException(status_code=400, detail=f"Invalid status transition from {current_status} to {new_status}")
+        
+        # Prepare update data
+        update_data = {'status': new_status}
+        
+        # Add timestamps based on status
+        if new_status == 'in_progress':
+            update_data['started_at'] = datetime.now().isoformat()
+        elif new_status == 'resolved':
+            update_data['resolved_at'] = datetime.now().isoformat()
+            update_data['resolved_by'] = current_user.id
+            if resolution_notes:
+                update_data['resolution_notes'] = resolution_notes
+        elif new_status == 'closed':
+            update_data['closed_at'] = datetime.now().isoformat()
+            update_data['closed_by'] = current_user.id
+        
+        # Update ticket
+        result = supabase.table('helpdesk_tickets').update(update_data).eq('id', ticket_id).eq('school_id', current_user.schoolId).execute()
+        
+        # Add status change comment
+        supabase.table('helpdesk_comments').insert({
+            'school_id': current_user.schoolId,
+            'ticket_id': ticket_id,
+            'user_id': current_user.id,
+            'comment': f"Status changed from {current_status} to {new_status}" + (f". Resolution: {resolution_notes}" if resolution_notes else ""),
+            'is_internal': True,
+            'created_at': datetime.now().isoformat()
+        }).execute()
+        
+        # Log the action
+        supabase.table('audit_logs').insert({
+            'school_id': current_user.schoolId,
+            'user_id': current_user.id,
+            'action': 'ticket_status_changed',
+            'entity_type': 'helpdesk_ticket',
+            'entity_id': ticket_id,
+            'details': {
+                'from': current_status,
+                'to': new_status,
+                'resolution_notes': resolution_notes
+            },
+            'created_at': datetime.now().isoformat()
+        }).execute()
+        
+        return {"success": True, "ticket": result.data[0]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating ticket status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/helpdesk/tickets/{ticket_id}/reopen")
+def reopen_ticket(ticket_id: str, payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Reopen a closed or resolved ticket"""
+    if not has_permission(current_user, "helpdesk:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        reason = payload.get('reason')
+        
+        # Get current ticket
+        ticket_result = supabase.table('helpdesk_tickets').select('*').eq('id', ticket_id).eq('school_id', current_user.schoolId).execute()
+        if not ticket_result.data:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+        
+        current_status = ticket_result.data[0].get('status')
+        
+        if current_status not in ['resolved', 'closed']:
+            raise HTTPException(status_code=400, detail="Only resolved or closed tickets can be reopened")
+        
+        # Reopen ticket
+        result = supabase.table('helpdesk_tickets').update({
+            'status': 'open',
+            'reopened_at': datetime.now().isoformat(),
+            'reopened_by': current_user.id,
+            'reopened_reason': reason
+        }).eq('id', ticket_id).eq('school_id', current_user.schoolId).execute()
+        
+        # Add reopen comment
+        supabase.table('helpdesk_comments').insert({
+            'school_id': current_user.schoolId,
+            'ticket_id': ticket_id,
+            'user_id': current_user.id,
+            'comment': f"Ticket reopened from {current_status}. Reason: {reason}",
+            'is_internal': True,
+            'created_at': datetime.now().isoformat()
+        }).execute()
+        
+        # Log the action
+        supabase.table('audit_logs').insert({
+            'school_id': current_user.schoolId,
+            'user_id': current_user.id,
+            'action': 'ticket_reopened',
+            'entity_type': 'helpdesk_ticket',
+            'entity_id': ticket_id,
+            'details': {
+                'from': current_status,
+                'reason': reason
+            },
+            'created_at': datetime.now().isoformat()
+        }).execute()
+        
+        return {"success": True, "ticket": result.data[0]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error reopening ticket: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/helpdesk/tickets/status-summary")
+def get_status_summary(current_user: AuthUser = Depends(get_current_user)):
+    """Get summary of tickets by status"""
+    if not has_permission(current_user, "helpdesk:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        # Get all tickets
+        tickets_result = supabase.table('helpdesk_tickets').select('*').eq('school_id', current_user.schoolId).execute()
+        
+        tickets = tickets_result.data or []
+        
+        # Count by status
+        status_counts = {}
+        for ticket in tickets:
+            status = ticket.get('status', 'unknown')
+            status_counts[status] = status_counts.get(status, 0) + 1
+        
+        return {
+            "status_summary": status_counts,
+            "total_tickets": len(tickets)
+        }
+    except Exception as e:
+        print(f"Error fetching status summary: {e}")
+        return {"status_summary": {}, "total_tickets": 0}
+
+
+@router.get("/staff/{staff_id}/performance")
+def get_staff_performance(staff_id: str, current_user: AuthUser = Depends(get_current_user)):
+    """Get performance metrics for a staff member"""
+    if not has_permission(current_user, "staff:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import datetime, timedelta
+        
+        # Get attendance for the last 30 days
+        thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
+        attendance_result = supabase.table('attendance').select('*').eq('staff_id', staff_id).eq('school_id', current_user.schoolId).gte('date', thirty_days_ago).execute()
+        attendance_records = attendance_result.data or []
+        
+        # Calculate attendance metrics
+        total_days = len(attendance_records)
+        present_days = len([a for a in attendance_records if a['status'] == 'present'])
+        attendance_rate = (present_days / total_days * 100) if total_days > 0 else 0
+        
+        # Get help desk tickets assigned and resolved
+        tickets_result = supabase.table('helpdesk_tickets').select('*').eq('assigned_to', staff_id).eq('school_id', current_user.schoolId).execute()
+        tickets = tickets_result.data or []
+        
+        total_tickets = len(tickets)
+        resolved_tickets = len([t for t in tickets if t['status'] == 'resolved'])
+        closed_tickets = len([t for t in tickets if t['status'] == 'closed'])
+        
+        # Calculate resolution rate
+        resolution_rate = (resolved_tickets / total_tickets * 100) if total_tickets > 0 else 0
+        
+        # Get average resolution time for resolved tickets
+        resolved_tickets_data = [t for t in tickets if t['status'] == 'resolved' and t.get('resolved_at') and t.get('created_at')]
+        resolution_times = []
+        for ticket in resolved_tickets_data:
+            try:
+                created = datetime.fromisoformat(ticket['created_at'])
+                resolved = datetime.fromisoformat(ticket['resolved_at'])
+                resolution_times.append((resolved - created).total_seconds() / 3600)  # hours
+            except:
+                pass
+        
+        avg_resolution_time = sum(resolution_times) / len(resolution_times) if resolution_times else 0
+        
+        # Get SLA compliance
+        sla_compliant = 0
+        sla_total = 0
+        for ticket in resolved_tickets_data:
+            if ticket.get('sla_deadline'):
+                sla_total += 1
+                try:
+                    deadline = datetime.fromisoformat(ticket['sla_deadline'])
+                    resolved = datetime.fromisoformat(ticket['resolved_at'])
+                    if resolved <= deadline:
+                        sla_compliant += 1
+                except:
+                    pass
+        
+        sla_compliance_rate = (sla_compliant / sla_total * 100) if sla_total > 0 else 0
+        
+        # Calculate overall score
+        attendance_score = attendance_rate * 0.3
+        resolution_score = resolution_rate * 0.4
+        sla_score = sla_compliance_rate * 0.3
+        overall_score = attendance_score + resolution_score + sla_score
+        
+        return {
+            "staff_id": staff_id,
+            "period": "last_30_days",
+            "metrics": {
+                "attendance": {
+                    "total_days": total_days,
+                    "present_days": present_days,
+                    "attendance_rate": round(attendance_rate, 2)
+                },
+                "helpdesk": {
+                    "total_tickets": total_tickets,
+                    "resolved_tickets": resolved_tickets,
+                    "closed_tickets": closed_tickets,
+                    "resolution_rate": round(resolution_rate, 2),
+                    "avg_resolution_time_hours": round(avg_resolution_time, 2),
+                    "sla_compliance_rate": round(sla_compliance_rate, 2)
+                }
+            },
+            "scorecard": {
+                "attendance_score": round(attendance_score, 2),
+                "resolution_score": round(resolution_score, 2),
+                "sla_score": round(sla_score, 2),
+                "overall_score": round(overall_score, 2),
+                "grade": get_performance_grade(overall_score)
+            }
+        }
+    except Exception as e:
+        print(f"Error fetching staff performance: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def get_performance_grade(score: float) -> str:
+    """Helper function to get performance grade from score"""
+    if score >= 90:
+        return "Excellent"
+    elif score >= 80:
+        return "Good"
+    elif score >= 70:
+        return "Satisfactory"
+    elif score >= 60:
+        return "Needs Improvement"
+    else:
+        return "Poor"
+
+
+@router.get("/staff/performance-summary")
+def get_staff_performance_summary(current_user: AuthUser = Depends(get_current_user)):
+    """Get performance summary for all staff"""
+    if not has_permission(current_user, "staff:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        # Get all staff for the school
+        staff_result = supabase.table('user_roles').select('*, users(*)').eq('school_id', current_user.schoolId).execute()
+        
+        staff_members = staff_result.data or []
+        performance_summary = []
+        
+        for staff in staff_members:
+            staff_id = staff['user_id']
+            user = staff.get('users', {})
+            
+            # Get performance for each staff member
+            try:
+                from datetime import datetime, timedelta
+                
+                # Attendance
+                thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
+                attendance_result = supabase.table('attendance').select('*').eq('staff_id', staff_id).eq('school_id', current_user.schoolId).gte('date', thirty_days_ago).execute()
+                attendance_records = attendance_result.data or []
+                
+                total_days = len(attendance_records)
+                present_days = len([a for a in attendance_records if a['status'] == 'present'])
+                attendance_rate = (present_days / total_days * 100) if total_days > 0 else 0
+                
+                # Help desk tickets
+                tickets_result = supabase.table('helpdesk_tickets').select('*').eq('assigned_to', staff_id).eq('school_id', current_user.schoolId).execute()
+                tickets = tickets_result.data or []
+                
+                total_tickets = len(tickets)
+                resolved_tickets = len([t for t in tickets if t['status'] == 'resolved'])
+                resolution_rate = (resolved_tickets / total_tickets * 100) if total_tickets > 0 else 0
+                
+                # SLA compliance
+                resolved_tickets_data = [t for t in tickets if t['status'] == 'resolved' and t.get('sla_deadline') and t.get('resolved_at')]
+                sla_compliant = 0
+                sla_total = 0
+                for ticket in resolved_tickets_data:
+                    sla_total += 1
+                    try:
+                        deadline = datetime.fromisoformat(ticket['sla_deadline'])
+                        resolved = datetime.fromisoformat(ticket['resolved_at'])
+                        if resolved <= deadline:
+                            sla_compliant += 1
+                    except:
+                        pass
+                
+                sla_compliance_rate = (sla_compliant / sla_total * 100) if sla_total > 0 else 0
+                
+                # Calculate score
+                attendance_score = attendance_rate * 0.3
+                resolution_score = resolution_rate * 0.4
+                sla_score = sla_compliance_rate * 0.3
+                overall_score = attendance_score + resolution_score + sla_score
+                
+                performance_summary.append({
+                    "staff_id": staff_id,
+                    "staff_name": user.get('name', 'Unknown'),
+                    "staff_email": user.get('email', ''),
+                    "role": staff.get('role', ''),
+                    "attendance_rate": round(attendance_rate, 2),
+                    "resolution_rate": round(resolution_rate, 2),
+                    "sla_compliance_rate": round(sla_compliance_rate, 2),
+                    "overall_score": round(overall_score, 2),
+                    "grade": get_performance_grade(overall_score)
+                })
+                
+            except Exception as e:
+                print(f"Error calculating performance for staff {staff_id}: {e}")
+                continue
+        
+        # Sort by overall score (descending)
+        performance_summary.sort(key=lambda x: x['overall_score'], reverse=True)
+        
+        return {
+            "performance_summary": performance_summary,
+            "total_staff": len(performance_summary)
+        }
+    except Exception as e:
+        print(f"Error fetching performance summary: {e}")
+        return {"performance_summary": [], "total_staff": 0}
+
+
+@router.get("/staff/{staff_id}/workload")
+def get_staff_workload(staff_id: str, current_user: AuthUser = Depends(get_current_user)):
+    """Get workload indicators for a staff member"""
+    if not has_permission(current_user, "staff:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        # Get active help desk tickets
+        tickets_result = supabase.table('helpdesk_tickets').select('*').eq('assigned_to', staff_id).eq('school_id', current_user.schoolId).not_.in_('status', ['resolved', 'closed']).execute()
+        active_tickets = tickets_result.data or []
+        
+        # Get overdue tickets
+        from datetime import datetime
+        overdue_tickets = []
+        critical_tickets = []
+        
+        for ticket in active_tickets:
+            sla_deadline = ticket.get('sla_deadline')
+            if sla_deadline:
+                try:
+                    deadline = datetime.fromisoformat(sla_deadline)
+                    now = datetime.now()
+                    hours_remaining = (deadline - now).total_seconds() / 3600
+                    
+                    if hours_remaining < 0:
+                        overdue_tickets.append(ticket)
+                    elif hours_remaining < 24:
+                        critical_tickets.append(ticket)
+                except:
+                    pass
+        
+        # Get tasks or other workload indicators (if applicable)
+        # For now, we'll use help desk tickets as the primary workload indicator
+        
+        workload_level = "low"
+        if len(active_tickets) > 10:
+            workload_level = "high"
+        elif len(active_tickets) > 5:
+            workload_level = "medium"
+        
+        return {
+            "staff_id": staff_id,
+            "workload": {
+                "active_tickets": len(active_tickets),
+                "overdue_tickets": len(overdue_tickets),
+                "critical_tickets": len(critical_tickets),
+                "workload_level": workload_level
+            },
+            "recommendations": get_workload_recommendations(len(active_tickets), len(overdue_tickets), len(critical_tickets))
+        }
+    except Exception as e:
+        print(f"Error fetching staff workload: {e}")
+        return {"staff_id": staff_id, "workload": {"active_tickets": 0, "overdue_tickets": 0, "critical_tickets": 0, "workload_level": "low"}, "recommendations": []}
+
+
+def get_workload_recommendations(active: int, overdue: int, critical: int) -> list:
+    """Helper function to get workload recommendations"""
+    recommendations = []
+    
+    if overdue > 0:
+        recommendations.append(f"Address {overdue} overdue ticket(s) immediately")
+    
+    if critical > 0:
+        recommendations.append(f"Prioritize {critical} critical ticket(s) approaching SLA deadline")
+    
+    if active > 10:
+        recommendations.append("Consider redistributing workload - high ticket volume")
+    elif active > 5:
+        recommendations.append("Monitor ticket volume - approaching capacity")
+    
+    if not recommendations:
+        recommendations.append("Workload is manageable - continue current pace")
+    
+    return recommendations
