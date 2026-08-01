@@ -2901,3 +2901,397 @@ def send_payment_receipt(payment_id: str, payload: dict, current_user: AuthUser 
     except Exception as e:
         print(f"Error sending receipt: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/helpdesk/tickets/sla-status")
+def get_sla_status(current_user: AuthUser = Depends(get_current_user)):
+    """Get SLA status for all help desk tickets"""
+    if not has_permission(current_user, "helpdesk:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import datetime
+        
+        # Get all tickets for the school
+        tickets_result = supabase.table('helpdesk_tickets').select('*').eq('school_id', current_user.schoolId).order('created_at', desc=True).limit(100).execute()
+        
+        tickets = tickets_result.data or []
+        sla_status = []
+        
+        for ticket in tickets:
+            # Calculate SLA status
+            sla_deadline = ticket.get('sla_deadline')
+            if sla_deadline:
+                deadline = datetime.fromisoformat(sla_deadline)
+                now = datetime.now()
+                
+                if ticket['status'] == 'resolved':
+                    sla_status.append({
+                        "ticket_id": ticket['id'],
+                        "ticket_number": ticket.get('ticket_number'),
+                        "subject": ticket.get('subject'),
+                        "status": ticket['status'],
+                        "sla_deadline": sla_deadline,
+                        "sla_status": "met" if ticket.get('resolved_at') and datetime.fromisoformat(ticket['resolved_at']) <= deadline else "missed",
+                        "priority": ticket.get('priority')
+                    })
+                else:
+                    hours_remaining = (deadline - now).total_seconds() / 3600
+                    if hours_remaining < 0:
+                        sla_status.append({
+                            "ticket_id": ticket['id'],
+                            "ticket_number": ticket.get('ticket_number'),
+                            "subject": ticket.get('subject'),
+                            "status": ticket['status'],
+                            "sla_deadline": sla_deadline,
+                            "sla_status": "overdue",
+                            "hours_overdue": abs(hours_remaining),
+                            "priority": ticket.get('priority')
+                        })
+                    elif hours_remaining < 24:
+                        sla_status.append({
+                            "ticket_id": ticket['id'],
+                            "ticket_number": ticket.get('ticket_number'),
+                            "subject": ticket.get('subject'),
+                            "status": ticket['status'],
+                            "sla_deadline": sla_deadline,
+                            "sla_status": "critical",
+                            "hours_remaining": hours_remaining,
+                            "priority": ticket.get('priority')
+                        })
+                    elif hours_remaining < 48:
+                        sla_status.append({
+                            "ticket_id": ticket['id'],
+                            "ticket_number": ticket.get('ticket_number'),
+                            "subject": ticket.get('subject'),
+                            "status": ticket['status'],
+                            "sla_deadline": sla_deadline,
+                            "sla_status": "warning",
+                            "hours_remaining": hours_remaining,
+                            "priority": ticket.get('priority')
+                        })
+                    else:
+                        sla_status.append({
+                            "ticket_id": ticket['id'],
+                            "ticket_number": ticket.get('ticket_number'),
+                            "subject": ticket.get('subject'),
+                            "status": ticket['status'],
+                            "sla_deadline": sla_deadline,
+                            "sla_status": "on_track",
+                            "hours_remaining": hours_remaining,
+                            "priority": ticket.get('priority')
+                        })
+            else:
+                sla_status.append({
+                    "ticket_id": ticket['id'],
+                    "ticket_number": ticket.get('ticket_number'),
+                    "subject": ticket.get('subject'),
+                    "status": ticket['status'],
+                    "sla_deadline": None,
+                    "sla_status": "not_set",
+                    "priority": ticket.get('priority')
+                })
+        
+        # Calculate summary
+        total_tickets = len(sla_status)
+        overdue_count = len([s for s in sla_status if s['sla_status'] == 'overdue'])
+        critical_count = len([s for s in sla_status if s['sla_status'] == 'critical'])
+        warning_count = len([s for s in sla_status if s['sla_status'] == 'warning'])
+        on_track_count = len([s for s in sla_status if s['sla_status'] == 'on_track'])
+        met_count = len([s for s in sla_status if s['sla_status'] == 'met'])
+        missed_count = len([s for s in sla_status if s['sla_status'] == 'missed'])
+        
+        return {
+            "sla_status": sla_status,
+            "summary": {
+                "total_tickets": total_tickets,
+                "overdue_count": overdue_count,
+                "critical_count": critical_count,
+                "warning_count": warning_count,
+                "on_track_count": on_track_count,
+                "met_count": met_count,
+                "missed_count": missed_count,
+                "sla_compliance_rate": (met_count / (met_count + missed_count) * 100) if (met_count + missed_count) > 0 else 0
+            }
+        }
+    except Exception as e:
+        print(f"Error fetching SLA status: {e}")
+        return {"sla_status": [], "summary": {"total_tickets": 0, "overdue_count": 0, "critical_count": 0, "warning_count": 0, "on_track_count": 0, "met_count": 0, "missed_count": 0, "sla_compliance_rate": 0}}
+
+
+@router.patch("/helpdesk/tickets/{ticket_id}/sla")
+def set_ticket_sla(ticket_id: str, payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Set SLA deadline for a ticket"""
+    if not has_permission(current_user, "helpdesk:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        update_data = {}
+        if payload.get('sla_deadline'):
+            update_data['sla_deadline'] = payload['sla_deadline']
+        if payload.get('priority'):
+            update_data['priority'] = payload['priority']
+        
+        result = supabase.table('helpdesk_tickets').update(update_data).eq('id', ticket_id).eq('school_id', current_user.schoolId).execute()
+        return {"success": True, "ticket": result.data[0]}
+    except Exception as e:
+        print(f"Error setting SLA: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/helpdesk/tickets/overdue")
+def get_overdue_tickets(current_user: AuthUser = Depends(get_current_user)):
+    """Get tickets that are overdue or approaching SLA deadline"""
+    if not has_permission(current_user, "helpdesk:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import datetime
+        
+        # Get tickets with SLA deadlines
+        tickets_result = supabase.table('helpdesk_tickets').select('*').eq('school_id', current_user.schoolId).not_.in_('status', ['resolved', 'closed']).execute()
+        
+        tickets = tickets_result.data or []
+        overdue_tickets = []
+        critical_tickets = []
+        
+        for ticket in tickets:
+            sla_deadline = ticket.get('sla_deadline')
+            if sla_deadline:
+                deadline = datetime.fromisoformat(sla_deadline)
+                now = datetime.now()
+                hours_remaining = (deadline - now).total_seconds() / 3600
+                
+                if hours_remaining < 0:
+                    overdue_tickets.append({
+                        "ticket_id": ticket['id'],
+                        "ticket_number": ticket.get('ticket_number'),
+                        "subject": ticket.get('subject'),
+                        "status": ticket['status'],
+                        "sla_deadline": sla_deadline,
+                        "hours_overdue": abs(hours_remaining),
+                        "priority": ticket.get('priority'),
+                        "assigned_to": ticket.get('assigned_to')
+                    })
+                elif hours_remaining < 24:
+                    critical_tickets.append({
+                        "ticket_id": ticket['id'],
+                        "ticket_number": ticket.get('ticket_number'),
+                        "subject": ticket.get('subject'),
+                        "status": ticket['status'],
+                        "sla_deadline": sla_deadline,
+                        "hours_remaining": hours_remaining,
+                        "priority": ticket.get('priority'),
+                        "assigned_to": ticket.get('assigned_to')
+                    })
+        
+        return {
+            "overdue_tickets": overdue_tickets,
+            "critical_tickets": critical_tickets,
+            "total_overdue": len(overdue_tickets),
+            "total_critical": len(critical_tickets)
+        }
+    except Exception as e:
+        print(f"Error fetching overdue tickets: {e}")
+        return {"overdue_tickets": [], "critical_tickets": [], "total_overdue": 0, "total_critical": 0}
+
+
+@router.post("/helpdesk/tickets/{ticket_id}/assign")
+def assign_ticket(ticket_id: str, payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Assign a ticket to a staff member"""
+    if not has_permission(current_user, "helpdesk:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        assigned_to = payload.get('assigned_to')
+        notes = payload.get('notes')
+        
+        # Update ticket assignment
+        result = supabase.table('helpdesk_tickets').update({
+            'assigned_to': assigned_to,
+            'assigned_at': datetime.now().isoformat(),
+            'assigned_by': current_user.id,
+            'status': 'assigned'
+        }).eq('id', ticket_id).eq('school_id', current_user.schoolId).execute()
+        
+        # Add assignment note if provided
+        if notes:
+            supabase.table('helpdesk_comments').insert({
+                'school_id': current_user.schoolId,
+                'ticket_id': ticket_id,
+                'user_id': current_user.id,
+                'comment': f"Ticket assigned to {assigned_to}. {notes}",
+                'is_internal': True,
+                'created_at': datetime.now().isoformat()
+            }).execute()
+        
+        # Log the action
+        supabase.table('audit_logs').insert({
+            'school_id': current_user.schoolId,
+            'user_id': current_user.id,
+            'action': 'ticket_assigned',
+            'entity_type': 'helpdesk_ticket',
+            'entity_id': ticket_id,
+            'details': {
+                'assigned_to': assigned_to,
+                'notes': notes
+            },
+            'created_at': datetime.now().isoformat()
+        }).execute()
+        
+        return {"success": True, "ticket": result.data[0]}
+    except Exception as e:
+        print(f"Error assigning ticket: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/helpdesk/tickets/{ticket_id}/reassign")
+def reassign_ticket(ticket_id: str, payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Reassign a ticket to a different staff member"""
+    if not has_permission(current_user, "helpdesk:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        assigned_to = payload.get('assigned_to')
+        reason = payload.get('reason')
+        
+        # Get current assignment
+        ticket_result = supabase.table('helpdesk_tickets').select('*').eq('id', ticket_id).eq('school_id', current_user.schoolId).execute()
+        if not ticket_result.data:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+        
+        current_assignment = ticket_result.data[0].get('assigned_to')
+        
+        # Update ticket assignment
+        result = supabase.table('helpdesk_tickets').update({
+            'assigned_to': assigned_to,
+            'reassigned_at': datetime.now().isoformat(),
+            'reassigned_by': current_user.id,
+            'previous_assigned_to': current_assignment
+        }).eq('id', ticket_id).eq('school_id', current_user.schoolId).execute()
+        
+        # Add reassignment note
+        supabase.table('helpdesk_comments').insert({
+            'school_id': current_user.schoolId,
+            'ticket_id': ticket_id,
+            'user_id': current_user.id,
+            'comment': f"Ticket reassigned from {current_assignment} to {assigned_to}. Reason: {reason}",
+            'is_internal': True,
+            'created_at': datetime.now().isoformat()
+        }).execute()
+        
+        # Log the action
+        supabase.table('audit_logs').insert({
+            'school_id': current_user.schoolId,
+            'user_id': current_user.id,
+            'action': 'ticket_reassigned',
+            'entity_type': 'helpdesk_ticket',
+            'entity_id': ticket_id,
+            'details': {
+                'from': current_assignment,
+                'to': assigned_to,
+                'reason': reason
+            },
+            'created_at': datetime.now().isoformat()
+        }).execute()
+        
+        return {"success": True, "ticket": result.data[0]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error reassigning ticket: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/helpdesk/tickets/unassigned")
+def get_unassigned_tickets(current_user: AuthUser = Depends(get_current_user)):
+    """Get tickets that are not assigned to anyone"""
+    if not has_permission(current_user, "helpdesk:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('helpdesk_tickets').select('*').eq('school_id', current_user.schoolId).is_('assigned_to', None).not_.in_('status', ['resolved', 'closed']).order('created_at', desc=True).limit(50).execute()
+        return {"unassigned_tickets": result.data or []}
+    except Exception as e:
+        print(f"Error fetching unassigned tickets: {e}")
+        return {"unassigned_tickets": []}
+
+
+@router.get("/helpdesk/tickets/my-tickets")
+def get_my_tickets(current_user: AuthUser = Depends(get_current_user)):
+    """Get tickets assigned to the current user"""
+    if not has_permission(current_user, "helpdesk:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('helpdesk_tickets').select('*').eq('school_id', current_user.schoolId).eq('assigned_to', current_user.id).not_.in_('status', ['resolved', 'closed']).order('created_at', desc=True).limit(50).execute()
+        return {"my_tickets": result.data or []}
+    except Exception as e:
+        print(f"Error fetching my tickets: {e}")
+        return {"my_tickets": []}
+
+
+@router.post("/helpdesk/tickets/auto-assign")
+def auto_assign_tickets(payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Auto-assign unassigned tickets based on workload and expertise"""
+    if not has_permission(current_user, "helpdesk:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        # Get unassigned tickets
+        unassigned_result = supabase.table('helpdesk_tickets').select('*').eq('school_id', current_user.schoolId).is_('assigned_to', None).not_.in_('status', ['resolved', 'closed']).execute()
+        
+        unassigned_tickets = unassigned_result.data or []
+        
+        # Get available staff with helpdesk role
+        staff_result = supabase.table('user_roles').select('*, users(*)').eq('school_id', current_user.schoolId).in_('role', ['school_admin', 'helpdesk', 'support']).execute()
+        
+        staff_members = staff_result.data or []
+        
+        assigned_count = 0
+        errors = []
+        
+        for ticket in unassigned_tickets:
+            try:
+                # Simple round-robin assignment based on current workload
+                # Get ticket count for each staff member
+                staff_workload = []
+                for staff in staff_members:
+                    staff_id = staff['user_id']
+                    ticket_count_result = supabase.table('helpdesk_tickets').select('*').eq('school_id', current_user.schoolId).eq('assigned_to', staff_id).not_.in_('status', ['resolved', 'closed']).execute()
+                    ticket_count = len(ticket_count_result.data or [])
+                    staff_workload.append({
+                        'staff_id': staff_id,
+                        'ticket_count': ticket_count
+                    })
+                
+                # Sort by workload (ascending)
+                staff_workload.sort(key=lambda x: x['ticket_count'])
+                
+                # Assign to staff with lowest workload
+                if staff_workload:
+                    assigned_to = staff_workload[0]['staff_id']
+                    
+                    supabase.table('helpdesk_tickets').update({
+                        'assigned_to': assigned_to,
+                        'assigned_at': datetime.now().isoformat(),
+                        'assigned_by': current_user.id,
+                        'status': 'assigned'
+                    }).eq('id', ticket['id']).execute()
+                    
+                    assigned_count += 1
+                else:
+                    errors.append({"ticket_id": ticket['id'], "error": "No available staff members"})
+                
+            except Exception as e:
+                errors.append({"ticket_id": ticket['id'], "error": str(e)})
+        
+        return {
+            "success": True,
+            "assigned_count": assigned_count,
+            "total_unassigned": len(unassigned_tickets),
+            "errors": errors
+        }
+    except Exception as e:
+        print(f"Error auto-assigning tickets: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
