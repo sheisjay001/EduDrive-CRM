@@ -1928,3 +1928,499 @@ def refresh_token(payload: AuthRefreshRequest) -> AuthResponse:
     except Exception as e:
         print(f"Error refreshing token: {e}")
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+
+@router.get("/leads/{lead_id}/tours")
+def get_lead_tours(lead_id: str, current_user: AuthUser = Depends(get_current_user)):
+    """Get all scheduled tours for a lead"""
+    if not has_permission(current_user, "admissions:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('tours').select('*').eq('lead_id', lead_id).eq('school_id', current_user.schoolId).order('scheduled_date', desc=True).execute()
+        return {"tours": result.data or []}
+    except Exception as e:
+        print(f"Error fetching tours: {e}")
+        return {"tours": []}
+
+
+@router.post("/leads/{lead_id}/tours")
+def schedule_tour(lead_id: str, payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Schedule a tour for a lead"""
+    if not has_permission(current_user, "admissions:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('tours').insert({
+            'school_id': current_user.schoolId,
+            'lead_id': lead_id,
+            'scheduled_date': payload.get('scheduled_date'),
+            'scheduled_time': payload.get('scheduled_time'),
+            'tour_type': payload.get('tour_type', 'general'),
+            'notes': payload.get('notes'),
+            'status': 'scheduled',
+            'scheduled_by': current_user.id
+        }).execute()
+        return {"success": True, "tour": result.data[0]}
+    except Exception as e:
+        print(f"Error scheduling tour: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/tours/{tour_id}")
+def update_tour(tour_id: str, payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Update a scheduled tour"""
+    if not has_permission(current_user, "admissions:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        update_data = {}
+        if payload.get('scheduled_date'):
+            update_data['scheduled_date'] = payload['scheduled_date']
+        if payload.get('scheduled_time'):
+            update_data['scheduled_time'] = payload['scheduled_time']
+        if payload.get('status'):
+            update_data['status'] = payload['status']
+        if payload.get('notes'):
+            update_data['notes'] = payload['notes']
+        
+        result = supabase.table('tours').update(update_data).eq('id', tour_id).eq('school_id', current_user.schoolId).execute()
+        return {"success": True, "tour": result.data[0]}
+    except Exception as e:
+        print(f"Error updating tour: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/leads/{lead_id}/assessments")
+def get_lead_assessments(lead_id: str, current_user: AuthUser = Depends(get_current_user)):
+    """Get all assessments for a lead"""
+    if not has_permission(current_user, "admissions:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('assessments').select('*').eq('lead_id', lead_id).eq('school_id', current_user.schoolId).order('scheduled_date', desc=True).execute()
+        return {"assessments": result.data or []}
+    except Exception as e:
+        print(f"Error fetching assessments: {e}")
+        return {"assessments": []}
+
+
+@router.post("/leads/{lead_id}/assessments")
+def schedule_assessment(lead_id: str, payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Schedule an assessment for a lead"""
+    if not has_permission(current_user, "admissions:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('assessments').insert({
+            'school_id': current_user.schoolId,
+            'lead_id': lead_id,
+            'scheduled_date': payload.get('scheduled_date'),
+            'scheduled_time': payload.get('scheduled_time'),
+            'assessment_type': payload.get('assessment_type'),
+            'notes': payload.get('notes'),
+            'status': 'scheduled',
+            'scheduled_by': current_user.id
+        }).execute()
+        return {"success": True, "assessment": result.data[0]}
+    except Exception as e:
+        print(f"Error scheduling assessment: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/assessments/{assessment_id}")
+def update_assessment(assessment_id: str, payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Update an assessment"""
+    if not has_permission(current_user, "admissions:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        update_data = {}
+        if payload.get('scheduled_date'):
+            update_data['scheduled_date'] = payload['scheduled_date']
+        if payload.get('scheduled_time'):
+            update_data['scheduled_time'] = payload['scheduled_time']
+        if payload.get('status'):
+            update_data['status'] = payload['status']
+        if payload.get('score'):
+            update_data['score'] = payload['score']
+        if payload.get('notes'):
+            update_data['notes'] = payload['notes']
+        
+        result = supabase.table('assessments').update(update_data).eq('id', assessment_id).eq('school_id', current_user.schoolId).execute()
+        return {"success": True, "assessment": result.data[0]}
+    except Exception as e:
+        print(f"Error updating assessment: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/finance/bulk-billing")
+def bulk_billing(payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Create bulk invoices for multiple students"""
+    if not has_permission(current_user, "finance:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        student_ids = payload.get('student_ids', [])
+        fee_structure_id = payload.get('fee_structure_id')
+        term_id = payload.get('term_id')
+        due_date = payload.get('due_date')
+        
+        # Get fee structure
+        fee_result = supabase.table('fee_structures').select('*').eq('id', fee_structure_id).eq('school_id', current_user.schoolId).execute()
+        if not fee_result.data:
+            raise HTTPException(status_code=404, detail="Fee structure not found")
+        
+        fee_structure = fee_result.data[0]
+        
+        created_invoices = []
+        errors = []
+        
+        for student_id in student_ids:
+            try:
+                # Get student info
+                student_result = supabase.table('students').select('*').eq('id', student_id).eq('school_id', current_user.schoolId).execute()
+                if not student_result.data:
+                    errors.append({"student_id": student_id, "error": "Student not found"})
+                    continue
+                
+                student = student_result.data[0]
+                
+                # Create invoice
+                invoice_result = supabase.table('invoices').insert({
+                    'school_id': current_user.schoolId,
+                    'student_id': student_id,
+                    'family_id': student['family_id'],
+                    'invoice_number': f"INV-{datetime.now().strftime('%Y%m%d')}-{len(created_invoices) + 1}",
+                    'amount_due': fee_structure['amount'],
+                    'amount_paid': 0,
+                    'due_date': due_date,
+                    'status': 'pending',
+                    'fee_structure_id': fee_structure_id,
+                    'term_id': term_id,
+                    'description': f"{fee_structure['name']} - {fee_structure['description']}",
+                    'created_by': current_user.id
+                }).execute()
+                
+                created_invoices.append(invoice_result.data[0])
+                
+                # Log the action
+                supabase.table('audit_logs').insert({
+                    'school_id': current_user.schoolId,
+                    'user_id': current_user.id,
+                    'action': 'bulk_invoice_created',
+                    'entity_type': 'invoice',
+                    'entity_id': invoice_result.data[0]['id'],
+                    'details': {
+                        'student_id': student_id,
+                        'fee_structure_id': fee_structure_id,
+                        'amount': fee_structure['amount']
+                    },
+                    'created_at': datetime.now().isoformat()
+                }).execute()
+                
+            except Exception as e:
+                errors.append({"student_id": student_id, "error": str(e)})
+        
+        return {
+            "success": True,
+            "created_invoices": created_invoices,
+            "total_created": len(created_invoices),
+            "errors": errors,
+            "total_errors": len(errors)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in bulk billing: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/finance/reconciliation")
+def get_reconciliation(current_user: AuthUser = Depends(get_current_user)):
+    """Get payment reconciliation report"""
+    if not has_permission(current_user, "finance:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        # Get all payments for the school
+        payments_result = supabase.table('payments').select('*').eq('school_id', current_user.schoolId).order('paid_at', desc=True).limit(100).execute()
+        
+        # Get invoices for reconciliation
+        invoices_result = supabase.table('invoices').select('*').eq('school_id', current_user.schoolId).execute()
+        
+        # Build reconciliation data
+        reconciliation = []
+        for payment in payments_result.data or []:
+            invoice = next((i for i in invoices_result.data or [] if i['id'] == payment['invoice_id']), None)
+            reconciliation.append({
+                "payment_id": payment['id'],
+                "invoice_number": invoice['invoice_number'] if invoice else 'Unknown',
+                "amount": payment['amount'],
+                "payment_method": payment['payment_method'],
+                "payment_reference": payment['payment_reference'],
+                "status": payment['status'],
+                "paid_at": payment['paid_at'],
+                "invoice_status": invoice['status'] if invoice else 'Unknown',
+                "is_reconciled": payment['status'] == 'completed' and (invoice and invoice['amount_paid'] >= invoice['amount_due'])
+            })
+        
+        return {
+            "reconciliation": reconciliation,
+            "total_payments": len(reconciliation),
+            "reconciled_count": len([r for r in reconciliation if r['is_reconciled']]),
+            "unreconciled_count": len([r for r in reconciliation if not r['is_reconciled']])
+        }
+    except Exception as e:
+        print(f"Error fetching reconciliation: {e}")
+        return {"reconciliation": [], "total_payments": 0, "reconciled_count": 0, "unreconciled_count": 0}
+
+
+@router.post("/finance/reconciliation/{payment_id}/match")
+def match_payment(payment_id: str, payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Manually match a payment to an invoice"""
+    if not has_permission(current_user, "finance:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        invoice_id = payload.get('invoice_id')
+        
+        # Get payment
+        payment_result = supabase.table('payments').select('*').eq('id', payment_id).eq('school_id', current_user.schoolId).execute()
+        if not payment_result.data:
+            raise HTTPException(status_code=404, detail="Payment not found")
+        
+        payment = payment_result.data[0]
+        
+        # Get invoice
+        invoice_result = supabase.table('invoices').select('*').eq('id', invoice_id).eq('school_id', current_user.schoolId).execute()
+        if not invoice_result.data:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        
+        invoice = invoice_result.data[0]
+        
+        # Update payment with invoice
+        supabase.table('payments').update({
+            'invoice_id': invoice_id,
+            'status': 'completed'
+        }).eq('id', payment_id).execute()
+        
+        # Update invoice amount paid
+        new_amount_paid = invoice['amount_paid'] + payment['amount']
+        new_status = 'paid' if new_amount_paid >= invoice['amount_due'] else 'part_paid'
+        
+        supabase.table('invoices').update({
+            'amount_paid': new_amount_paid,
+            'status': new_status
+        }).eq('id', invoice_id).execute()
+        
+        # Log the action
+        supabase.table('audit_logs').insert({
+            'school_id': current_user.schoolId,
+            'user_id': current_user.id,
+            'action': 'payment_matched',
+            'entity_type': 'payment',
+            'entity_id': payment_id,
+            'details': {
+                'invoice_id': invoice_id,
+                'amount': payment['amount']
+            },
+            'created_at': datetime.now().isoformat()
+        }).execute()
+        
+        return {"success": True, "message": "Payment matched successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error matching payment: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/reminders")
+def get_reminders(current_user: AuthUser = Depends(get_current_user)):
+    """Get all reminders for the school"""
+    if not has_permission(current_user, "reminders:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('reminders').select('*').eq('school_id', current_user.schoolId).order('scheduled_for', asc=True).limit(50).execute()
+        return {"reminders": result.data or []}
+    except Exception as e:
+        print(f"Error fetching reminders: {e}")
+        return {"reminders": []}
+
+
+@router.post("/reminders")
+def create_reminder(payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Create a new reminder"""
+    if not has_permission(current_user, "reminders:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('reminders').insert({
+            'school_id': current_user.schoolId,
+            'title': payload.get('title'),
+            'description': payload.get('description'),
+            'reminder_type': payload.get('reminder_type'),
+            'entity_type': payload.get('entity_type'),
+            'entity_id': payload.get('entity_id'),
+            'scheduled_for': payload.get('scheduled_for'),
+            'status': 'pending',
+            'channels': payload.get('channels', ['email']),
+            'created_by': current_user.id
+        }).execute()
+        return {"success": True, "reminder": result.data[0]}
+    except Exception as e:
+        print(f"Error creating reminder: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/reminders/{reminder_id}")
+def update_reminder(reminder_id: str, payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Update a reminder"""
+    if not has_permission(current_user, "reminders:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        update_data = {}
+        if payload.get('title'):
+            update_data['title'] = payload['title']
+        if payload.get('description'):
+            update_data['description'] = payload['description']
+        if payload.get('scheduled_for'):
+            update_data['scheduled_for'] = payload['scheduled_for']
+        if payload.get('status'):
+            update_data['status'] = payload['status']
+        if payload.get('channels'):
+            update_data['channels'] = payload['channels']
+        
+        result = supabase.table('reminders').update(update_data).eq('id', reminder_id).eq('school_id', current_user.schoolId).execute()
+        return {"success": True, "reminder": result.data[0]}
+    except Exception as e:
+        print(f"Error updating reminder: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/reminders/{reminder_id}")
+def delete_reminder(reminder_id: str, current_user: AuthUser = Depends(get_current_user)):
+    """Delete a reminder"""
+    if not has_permission(current_user, "reminders:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('reminders').delete().eq('id', reminder_id).eq('school_id', current_user.schoolId).execute()
+        return {"success": True, "id": reminder_id}
+    except Exception as e:
+        print(f"Error deleting reminder: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/staff/{staff_id}/attendance")
+def get_staff_attendance(staff_id: str, current_user: AuthUser = Depends(get_current_user)):
+    """Get attendance records for a staff member"""
+    if not has_permission(current_user, "staff:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('attendance').select('*').eq('staff_id', staff_id).eq('school_id', current_user.schoolId).order('date', desc=True).limit(100).execute()
+        return {"attendance": result.data or []}
+    except Exception as e:
+        print(f"Error fetching attendance: {e}")
+        return {"attendance": []}
+
+
+@router.get("/attendance")
+def get_all_attendance(current_user: AuthUser = Depends(get_current_user)):
+    """Get all attendance records for the school"""
+    if not has_permission(current_user, "staff:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('attendance').select('*').eq('school_id', current_user.schoolId).order('date', desc=True).limit(200).execute()
+        return {"attendance": result.data or []}
+    except Exception as e:
+        print(f"Error fetching attendance: {e}")
+        return {"attendance": []}
+
+
+@router.post("/attendance")
+def record_attendance(payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Record attendance for staff"""
+    if not has_permission(current_user, "staff:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('attendance').insert({
+            'school_id': current_user.schoolId,
+            'staff_id': payload.get('staff_id'),
+            'date': payload.get('date'),
+            'check_in_time': payload.get('check_in_time'),
+            'check_out_time': payload.get('check_out_time'),
+            'status': payload.get('status', 'present'),
+            'notes': payload.get('notes'),
+            'recorded_by': current_user.id
+        }).execute()
+        return {"success": True, "attendance": result.data[0]}
+    except Exception as e:
+        print(f"Error recording attendance: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/attendance/{attendance_id}")
+def update_attendance(attendance_id: str, payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Update an attendance record"""
+    if not has_permission(current_user, "staff:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        update_data = {}
+        if payload.get('check_in_time'):
+            update_data['check_in_time'] = payload['check_in_time']
+        if payload.get('check_out_time'):
+            update_data['check_out_time'] = payload['check_out_time']
+        if payload.get('status'):
+            update_data['status'] = payload['status']
+        if payload.get('notes'):
+            update_data['notes'] = payload['notes']
+        
+        result = supabase.table('attendance').update(update_data).eq('id', attendance_id).eq('school_id', current_user.schoolId).execute()
+        return {"success": True, "attendance": result.data[0]}
+    except Exception as e:
+        print(f"Error updating attendance: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/attendance/summary")
+def get_attendance_summary(current_user: AuthUser = Depends(get_current_user)):
+    """Get attendance summary for the school"""
+    if not has_permission(current_user, "staff:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import date, timedelta
+        
+        # Get attendance for the last 30 days
+        thirty_days_ago = (date.today() - timedelta(days=30)).isoformat()
+        result = supabase.table('attendance').select('*').eq('school_id', current_user.schoolId).gte('date', thirty_days_ago).execute()
+        
+        attendance_records = result.data or []
+        
+        # Calculate summary
+        total_records = len(attendance_records)
+        present_count = len([a for a in attendance_records if a['status'] == 'present'])
+        absent_count = len([a for a in attendance_records if a['status'] == 'absent'])
+        late_count = len([a for a in attendance_records if a['status'] == 'late'])
+        
+        return {
+            "summary": {
+                "total_records": total_records,
+                "present_count": present_count,
+                "absent_count": absent_count,
+                "late_count": late_count,
+                "attendance_rate": (present_count / total_records * 100) if total_records > 0 else 0
+            },
+            "period": "last_30_days"
+        }
+    except Exception as e:
+        print(f"Error fetching attendance summary: {e}")
+        return {"summary": {"total_records": 0, "present_count": 0, "absent_count": 0, "late_count": 0, "attendance_rate": 0}, "period": "last_30_days"}
