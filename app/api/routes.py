@@ -2424,3 +2424,480 @@ def get_attendance_summary(current_user: AuthUser = Depends(get_current_user)):
     except Exception as e:
         print(f"Error fetching attendance summary: {e}")
         return {"summary": {"total_records": 0, "present_count": 0, "absent_count": 0, "late_count": 0, "attendance_rate": 0}, "period": "last_30_days"}
+
+
+@router.post("/reminders/process")
+def process_reminders(current_user: AuthUser = Depends(get_current_user)):
+    """Process pending reminders and send notifications"""
+    if not has_permission(current_user, "reminders:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import datetime
+        
+        # Get pending reminders that are due
+        now = datetime.now().isoformat()
+        result = supabase.table('reminders').select('*').eq('school_id', current_user.schoolId).eq('status', 'pending').lte('scheduled_for', now).execute()
+        
+        reminders = result.data or []
+        processed_count = 0
+        errors = []
+        
+        for reminder in reminders:
+            try:
+                # Get school settings for communication
+                school_result = supabase.table('schools').select('*').eq('id', current_user.schoolId).execute()
+                school = school_result.data[0] if school_result.data else None
+                
+                if not school:
+                    errors.append({"reminder_id": reminder['id'], "error": "School not found"})
+                    continue
+                
+                # Get recipient based on entity type
+                recipient_email = None
+                recipient_phone = None
+                recipient_name = None
+                
+                if reminder['entity_type'] == 'invoice':
+                    # Get invoice and family info
+                    invoice_result = supabase.table('invoices').select('*, families(*)').eq('id', reminder['entity_id']).execute()
+                    if invoice_result.data:
+                        invoice = invoice_result.data[0]
+                        family = invoice.get('families')
+                        if family:
+                            recipient_email = family.get('email')
+                            recipient_phone = family.get('phone')
+                            recipient_name = family.get('primary_contact_name')
+                
+                elif reminder['entity_type'] == 'lead':
+                    # Get lead info
+                    lead_result = supabase.table('leads').select('*').eq('id', reminder['entity_id']).execute()
+                    if lead_result.data:
+                        lead = lead_result.data[0]
+                        recipient_email = lead.get('email')
+                        recipient_phone = lead.get('phone')
+                        recipient_name = lead.get('name')
+                
+                # Send notifications based on channels
+                channels = reminder.get('channels', ['email'])
+                message_sent = False
+                
+                if 'email' in channels and recipient_email:
+                    # Get Brevo settings
+                    brevo_key = school.get('metadata', {}).get('brevo_api_key')
+                    if brevo_key:
+                        try:
+                            import httpx
+                            response = httpx.post(
+                                "https://api.brevo.com/v3/smtp/email",
+                                headers={"api-key": brevo_key, "Content-Type": "application/json"},
+                                json={
+                                    "sender": {"name": school.get('name', 'EduDrive CRM'), "email": "noreply@edudrive.com"},
+                                    "to": [{"email": recipient_email, "name": recipient_name or "Parent"}],
+                                    "subject": reminder['title'],
+                                    "htmlContent": reminder['description']
+                                },
+                                timeout=30
+                            )
+                            if response.status_code in [200, 201, 202]:
+                                message_sent = True
+                        except Exception as e:
+                            print(f"Error sending email: {e}")
+                
+                if 'sms' in channels and recipient_phone:
+                    # Get Termii settings
+                    termii_key = school.get('metadata', {}).get('termii_api_key')
+                    if termii_key:
+                        try:
+                            import httpx
+                            response = httpx.post(
+                                "https://api.ng.termii.com/api/sms/send",
+                                json={
+                                    "api_key": termii_key,
+                                    "to": recipient_phone,
+                                    "from": "EduDrive",
+                                    "sms": reminder['title'] + " - " + reminder['description'],
+                                    "type": "plain",
+                                    "channel": "dnd"
+                                },
+                                timeout=30
+                            )
+                            if response.status_code == 200:
+                                message_sent = True
+                        except Exception as e:
+                            print(f"Error sending SMS: {e}")
+                
+                if 'whatsapp' in channels and recipient_phone:
+                    # Get WhatsApp settings
+                    whatsapp_token = school.get('metadata', {}).get('whatsapp_access_token')
+                    whatsapp_phone_id = school.get('metadata', {}).get('whatsapp_phone_number_id')
+                    if whatsapp_token and whatsapp_phone_id:
+                        try:
+                            import httpx
+                            response = httpx.post(
+                                f"https://graph.facebook.com/v17.0/{whatsapp_phone_id}/messages",
+                                headers={"Authorization": f"Bearer {whatsapp_token}", "Content-Type": "application/json"},
+                                json={
+                                    "messaging_product": "whatsapp",
+                                    "to": recipient_phone,
+                                    "type": "text",
+                                    "text": {"body": reminder['title'] + "\n\n" + reminder['description']}
+                                },
+                                timeout=30
+                            )
+                            if response.status_code == 200:
+                                message_sent = True
+                        except Exception as e:
+                            print(f"Error sending WhatsApp message: {e}")
+                
+                # Update reminder status
+                if message_sent:
+                    supabase.table('reminders').update({'status': 'sent', 'sent_at': datetime.now().isoformat()}).eq('id', reminder['id']).execute()
+                    processed_count += 1
+                else:
+                    supabase.table('reminders').update({'status': 'failed'}).eq('id', reminder['id']).execute()
+                    errors.append({"reminder_id": reminder['id'], "error": "No message sent - check communication settings"})
+                
+            except Exception as e:
+                errors.append({"reminder_id": reminder['id'], "error": str(e)})
+        
+        return {
+            "success": True,
+            "processed_count": processed_count,
+            "total_reminders": len(reminders),
+            "errors": errors
+        }
+    except Exception as e:
+        print(f"Error processing reminders: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/finance/fee-due-notifications")
+def create_fee_due_notifications(payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Create reminders for invoices with upcoming due dates"""
+    if not has_permission(current_user, "finance:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import datetime, timedelta
+        
+        days_ahead = payload.get('days_ahead', 7)
+        channels = payload.get('channels', ['email'])
+        
+        # Calculate the date threshold
+        threshold_date = (datetime.now() + timedelta(days=days_ahead)).date().isoformat()
+        
+        # Get unpaid invoices with due dates within the threshold
+        invoices_result = supabase.table('invoices').select('*').eq('school_id', current_user.schoolId).in_('status', ['pending', 'part_paid']).lte('due_date', threshold_date).execute()
+        
+        invoices = invoices_result.data or []
+        created_reminders = []
+        errors = []
+        
+        for invoice in invoices:
+            try:
+                # Check if a reminder already exists for this invoice
+                existing_result = supabase.table('reminders').select('*').eq('school_id', current_user.schoolId).eq('entity_type', 'invoice').eq('entity_id', invoice['id']).eq('status', 'pending').execute()
+                
+                if existing_result.data:
+                    # Reminder already exists, skip
+                    continue
+                
+                # Get family info
+                family_result = supabase.table('families').select('*').eq('id', invoice['family_id']).execute()
+                family = family_result.data[0] if family_result.data else None
+                
+                if not family:
+                    errors.append({"invoice_id": invoice['id'], "error": "Family not found"})
+                    continue
+                
+                # Calculate days until due
+                due_date = datetime.fromisoformat(invoice['due_date']).date()
+                days_until_due = (due_date - datetime.now().date()).days
+                
+                # Create reminder
+                reminder_result = supabase.table('reminders').insert({
+                    'school_id': current_user.schoolId,
+                    'title': f"Fee Due Reminder - Invoice #{invoice['invoice_number']}",
+                    'description': f"Dear {family.get('primary_contact_name', 'Parent')}, this is a reminder that invoice #{invoice['invoice_number']} for {invoice.get('description', 'fees')} is due on {invoice['due_date']}. Amount due: {invoice['amount_due'] - invoice['amount_paid']}. Please ensure payment is made before the due date to avoid late fees.",
+                    'reminder_type': 'fee_due',
+                    'entity_type': 'invoice',
+                    'entity_id': invoice['id'],
+                    'scheduled_for': datetime.now().isoformat(),
+                    'status': 'pending',
+                    'channels': channels,
+                    'created_by': current_user.id
+                }).execute()
+                
+                created_reminders.append(reminder_result.data[0])
+                
+            except Exception as e:
+                errors.append({"invoice_id": invoice['id'], "error": str(e)})
+        
+        return {
+            "success": True,
+            "created_reminders": created_reminders,
+            "total_created": len(created_reminders),
+            "total_invoices": len(invoices),
+            "errors": errors
+        }
+    except Exception as e:
+        print(f"Error creating fee due notifications: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/admissions/follow-up-reminders")
+def create_admission_follow_up_reminders(payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Create follow-up reminders for leads that haven't been updated recently"""
+    if not has_permission(current_user, "admissions:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import datetime, timedelta
+        
+        days_inactive = payload.get('days_inactive', 7)
+        channels = payload.get('channels', ['email'])
+        
+        # Calculate the date threshold for inactive leads
+        threshold_date = (datetime.now() - timedelta(days=days_inactive)).isoformat()
+        
+        # Get leads that haven't been updated recently and are not in final stages
+        leads_result = supabase.table('leads').select('*').eq('school_id', current_user.schoolId).not_.in_('stage', ['enrolled', 'lost']).lte('updated_at', threshold_date).execute()
+        
+        leads = leads_result.data or []
+        created_reminders = []
+        errors = []
+        
+        for lead in leads:
+            try:
+                # Check if a reminder already exists for this lead
+                existing_result = supabase.table('reminders').select('*').eq('school_id', current_user.schoolId).eq('entity_type', 'lead').eq('entity_id', lead['id']).eq('status', 'pending').execute()
+                
+                if existing_result.data:
+                    # Reminder already exists, skip
+                    continue
+                
+                # Calculate days since last update
+                last_updated = datetime.fromisoformat(lead['updated_at'])
+                days_since_update = (datetime.now() - last_updated).days
+                
+                # Create reminder
+                reminder_result = supabase.table('reminders').insert({
+                    'school_id': current_user.schoolId,
+                    'title': f"Follow-up Required - {lead.get('name', 'Lead')}",
+                    'description': f"Lead {lead.get('name', 'Unknown')} (Stage: {lead.get('stage', 'Unknown')}) has not been updated for {days_since_update} days. Please follow up with {lead.get('email', 'the lead')} at {lead.get('phone', 'N/A')} to move them forward in the admissions process.",
+                    'reminder_type': 'admission_follow_up',
+                    'entity_type': 'lead',
+                    'entity_id': lead['id'],
+                    'scheduled_for': datetime.now().isoformat(),
+                    'status': 'pending',
+                    'channels': channels,
+                    'created_by': current_user.id
+                }).execute()
+                
+                created_reminders.append(reminder_result.data[0])
+                
+            except Exception as e:
+                errors.append({"lead_id": lead['id'], "error": str(e)})
+        
+        return {
+            "success": True,
+            "created_reminders": created_reminders,
+            "total_created": len(created_reminders),
+            "total_leads": len(leads),
+            "errors": errors
+        }
+    except Exception as e:
+        print(f"Error creating admission follow-up reminders: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/payments/{payment_id}/receipt")
+def get_payment_receipt(payment_id: str, current_user: AuthUser = Depends(get_current_user)):
+    """Get receipt for a payment"""
+    if not has_permission(current_user, "finance:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        # Get payment with invoice and family info
+        payment_result = supabase.table('payments').select('*, invoices(*, families(*))').eq('id', payment_id).eq('school_id', current_user.schoolId).execute()
+        
+        if not payment_result.data:
+            raise HTTPException(status_code=404, detail="Payment not found")
+        
+        payment = payment_result.data[0]
+        invoice = payment.get('invoices')
+        family = invoice.get('families') if invoice else None
+        
+        # Get school info
+        school_result = supabase.table('schools').select('*').eq('id', current_user.schoolId).execute()
+        school = school_result.data[0] if school_result.data else None
+        
+        # Generate receipt data
+        receipt_data = {
+            "receipt_number": f"RCP-{payment['id'][:8].upper()}",
+            "payment_date": payment['paid_at'],
+            "amount": payment['amount'],
+            "payment_method": payment['payment_method'],
+            "payment_reference": payment['payment_reference'],
+            "school_name": school.get('name', 'School') if school else 'School',
+            "school_address": school.get('address', '') if school else '',
+            "invoice_number": invoice['invoice_number'] if invoice else 'N/A',
+            "invoice_description": invoice.get('description', '') if invoice else '',
+            "family_name": family.get('primary_contact_name', '') if family else '',
+            "family_email": family.get('email', '') if family else '',
+            "family_phone": family.get('phone', '') if family else ''
+        }
+        
+        return {"receipt": receipt_data}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching receipt: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/payments/{payment_id}/receipt/send")
+def send_payment_receipt(payment_id: str, payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Send receipt for a payment via email/SMS/WhatsApp"""
+    if not has_permission(current_user, "finance:manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        channels = payload.get('channels', ['email'])
+        
+        # Get payment with invoice and family info
+        payment_result = supabase.table('payments').select('*, invoices(*, families(*))').eq('id', payment_id).eq('school_id', current_user.schoolId).execute()
+        
+        if not payment_result.data:
+            raise HTTPException(status_code=404, detail="Payment not found")
+        
+        payment = payment_result.data[0]
+        invoice = payment.get('invoices')
+        family = invoice.get('families') if invoice else None
+        
+        if not family:
+            raise HTTPException(status_code=404, detail="Family not found")
+        
+        # Get school info
+        school_result = supabase.table('schools').select('*').eq('id', current_user.schoolId).execute()
+        school = school_result.data[0] if school_result.data else None
+        
+        if not school:
+            raise HTTPException(status_code=404, detail="School not found")
+        
+        # Generate receipt content
+        receipt_number = f"RCP-{payment['id'][:8].upper()}"
+        receipt_content = f"""
+        <h2>Payment Receipt</h2>
+        <p><strong>Receipt Number:</strong> {receipt_number}</p>
+        <p><strong>Date:</strong> {payment['paid_at']}</p>
+        <p><strong>Amount:</strong> {payment['amount']}</p>
+        <p><strong>Payment Method:</strong> {payment['payment_method']}</p>
+        <p><strong>Reference:</strong> {payment['payment_reference']}</p>
+        <hr>
+        <p><strong>Invoice:</strong> {invoice['invoice_number'] if invoice else 'N/A'}</p>
+        <p><strong>Description:</strong> {invoice.get('description', '') if invoice else ''}</p>
+        <hr>
+        <p><strong>{school.get('name', 'School')}</strong></p>
+        <p>{school.get('address', '') if school else ''}</p>
+        """
+        
+        sent_channels = []
+        errors = []
+        
+        # Send via email
+        if 'email' in channels and family.get('email'):
+            brevo_key = school.get('metadata', {}).get('brevo_api_key')
+            if brevo_key:
+                try:
+                    import httpx
+                    response = httpx.post(
+                        "https://api.brevo.com/v3/smtp/email",
+                        headers={"api-key": brevo_key, "Content-Type": "application/json"},
+                        json={
+                            "sender": {"name": school.get('name', 'EduDrive CRM'), "email": "noreply@edudrive.com"},
+                            "to": [{"email": family.get('email'), "name": family.get('primary_contact_name', 'Parent')}],
+                            "subject": f"Payment Receipt - {receipt_number}",
+                            "htmlContent": receipt_content
+                        },
+                        timeout=30
+                    )
+                    if response.status_code in [200, 201, 202]:
+                        sent_channels.append('email')
+                except Exception as e:
+                    errors.append({"channel": "email", "error": str(e)})
+        
+        # Send via SMS
+        if 'sms' in channels and family.get('phone'):
+            termii_key = school.get('metadata', {}).get('termii_api_key')
+            if termii_key:
+                try:
+                    import httpx
+                    sms_content = f"Payment Receipt {receipt_number}. Amount: {payment['amount']}. Date: {payment['paid_at']}. Thank you for your payment."
+                    response = httpx.post(
+                        "https://api.ng.termii.com/api/sms/send",
+                        json={
+                            "api_key": termii_key,
+                            "to": family.get('phone'),
+                            "from": "EduDrive",
+                            "sms": sms_content,
+                            "type": "plain",
+                            "channel": "dnd"
+                        },
+                        timeout=30
+                    )
+                    if response.status_code == 200:
+                        sent_channels.append('sms')
+                except Exception as e:
+                    errors.append({"channel": "sms", "error": str(e)})
+        
+        # Send via WhatsApp
+        if 'whatsapp' in channels and family.get('phone'):
+            whatsapp_token = school.get('metadata', {}).get('whatsapp_access_token')
+            whatsapp_phone_id = school.get('metadata', {}).get('whatsapp_phone_number_id')
+            if whatsapp_token and whatsapp_phone_id:
+                try:
+                    import httpx
+                    whatsapp_content = f"Payment Receipt {receipt_number}\n\nAmount: {payment['amount']}\nDate: {payment['paid_at']}\nInvoice: {invoice['invoice_number'] if invoice else 'N/A'}\n\nThank you for your payment."
+                    response = httpx.post(
+                        f"https://graph.facebook.com/v17.0/{whatsapp_phone_id}/messages",
+                        headers={"Authorization": f"Bearer {whatsapp_token}", "Content-Type": "application/json"},
+                        json={
+                            "messaging_product": "whatsapp",
+                            "to": family.get('phone'),
+                            "type": "text",
+                            "text": {"body": whatsapp_content}
+                        },
+                        timeout=30
+                    )
+                    if response.status_code == 200:
+                        sent_channels.append('whatsapp')
+                except Exception as e:
+                    errors.append({"channel": "whatsapp", "error": str(e)})
+        
+        # Log the action
+        supabase.table('audit_logs').insert({
+            'school_id': current_user.schoolId,
+            'user_id': current_user.id,
+            'action': 'receipt_sent',
+            'entity_type': 'payment',
+            'entity_id': payment_id,
+            'details': {
+                'channels': sent_channels,
+                'receipt_number': receipt_number
+            },
+            'created_at': datetime.now().isoformat()
+        }).execute()
+        
+        return {
+            "success": True,
+            "sent_channels": sent_channels,
+            "receipt_number": receipt_number,
+            "errors": errors
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error sending receipt: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
