@@ -4652,3 +4652,217 @@ def get_student_retention_analysis(current_user: AuthUser = Depends(get_current_
     except Exception as e:
         print(f"Error fetching student retention analysis: {e}")
         return {"student_retention": {"by_year": {}, "overall_retention_rate": 0, "total_students": 0, "active_students": 0, "inactive_students": 0, "retention_trend": "unknown"}}
+
+
+@router.post("/auth/parent-login")
+def parent_login(payload: dict):
+    """Parent login endpoint"""
+    email = payload.get('email')
+    password = payload.get('password')
+    
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email and password are required")
+    
+    supabase = get_supabase_client()
+    try:
+        # Authenticate with Supabase
+        auth_response = supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": password
+        })
+        
+        # Check if user has parent role
+        user_id = auth_response.user.id
+        roles_result = supabase.table('user_roles').select('*').eq('user_id', user_id).execute()
+        roles = roles_result.data or []
+        
+        parent_role = None
+        for role in roles:
+            if role['role'] == 'parent':
+                parent_role = role
+                break
+        
+        if not parent_role:
+            raise HTTPException(status_code=403, detail="User does not have parent role")
+        
+        # Get parent's family information
+        family_result = supabase.table('families').select('*').eq('primary_contact_email', email).execute()
+        family = family_result.data[0] if family_result.data else None
+        
+        return {
+            "access_token": auth_response.session.access_token,
+            "refresh_token": auth_response.session.refresh_token,
+            "user": {
+                "id": auth_response.user.id,
+                "email": auth_response.user.email,
+                "role": "parent",
+                "family_id": family['id'] if family else None
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error during parent login: {e}")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+
+@router.get("/parent/children")
+def get_parent_children(current_user: AuthUser = Depends(get_current_user)):
+    """Get children for the logged-in parent"""
+    if current_user.role != "parent":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    supabase = get_supabase_client()
+    try:
+        # Get parent's family
+        family_result = supabase.table('families').select('*').eq('primary_contact_email', current_user.email).execute()
+        family = family_result.data[0] if family_result.data else None
+        
+        if not family:
+            return {"children": []}
+        
+        # Get students in the family
+        students_result = supabase.table('students').select('*, classes(*)').eq('family_id', family['id']).execute()
+        students = students_result.data or []
+        
+        children = []
+        for student in students:
+            children.append({
+                "id": student['id'],
+                "name": student.get('name', ''),
+                "email": student.get('email', ''),
+                "class": student.get('classes', {}).get('name', ''),
+                "status": student.get('status', ''),
+                "enrollment_date": student.get('enrollment_date', '')
+            })
+        
+        return {"children": children}
+    except Exception as e:
+        print(f"Error fetching parent children: {e}")
+        return {"children": []}
+
+
+@router.get("/parent/invoices")
+def get_parent_invoices(current_user: AuthUser = Depends(get_current_user)):
+    """Get invoices for the logged-in parent"""
+    if current_user.role != "parent":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    supabase = get_supabase_client()
+    try:
+        # Get parent's family
+        family_result = supabase.table('families').select('*').eq('primary_contact_email', current_user.email).execute()
+        family = family_result.data[0] if family_result.data else None
+        
+        if not family:
+            return {"invoices": []}
+        
+        # Get invoices for the family
+        invoices_result = supabase.table('invoices').select('*').eq('family_id', family['id']).order('created_at', desc=True).execute()
+        invoices = invoices_result.data or []
+        
+        return {"invoices": invoices}
+    except Exception as e:
+        print(f"Error fetching parent invoices: {e}")
+        return {"invoices": []}
+
+
+@router.get("/parent/payments")
+def get_parent_payments(current_user: AuthUser = Depends(get_current_user)):
+    """Get payment history for the logged-in parent"""
+    if current_user.role != "parent":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    supabase = get_supabase_client()
+    try:
+        # Get parent's family
+        family_result = supabase.table('families').select('*').eq('primary_contact_email', current_user.email).execute()
+        family = family_result.data[0] if family_result.data else None
+        
+        if not family:
+            return {"payments": []}
+        
+        # Get payments for the family
+        payments_result = supabase.table('payments').select('*, invoices(*)').eq('family_id', family['id']).order('paid_at', desc=True).execute()
+        payments = payments_result.data or []
+        
+        return {"payments": payments}
+    except Exception as e:
+        print(f"Error fetching parent payments: {e}")
+        return {"payments": []}
+
+
+@router.get("/parent/communications")
+def get_parent_communications(current_user: AuthUser = Depends(get_current_user)):
+    """Get communication history for the logged-in parent"""
+    if current_user.role != "parent":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    supabase = get_supabase_client()
+    try:
+        # Get parent's family
+        family_result = supabase.table('families').select('*').eq('primary_contact_email', current_user.email).execute()
+        family = family_result.data[0] if family_result.data else None
+        
+        if not family:
+            return {"communications": []}
+        
+        # Get communications for the family
+        communications_result = supabase.table('communications').select('*').eq('family_id', family['id']).order('sent_at', desc=True).execute()
+        communications = communications_result.data or []
+        
+        return {"communications": communications}
+    except Exception as e:
+        print(f"Error fetching parent communications: {e}")
+        return {"communications": []}
+
+
+@router.get("/student/academic-records")
+def get_student_academic_records(current_user: AuthUser = Depends(get_current_user)):
+    """Get academic records for the logged-in student"""
+    if current_user.role != "student":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    supabase = get_supabase_client()
+    try:
+        # Get student's academic records
+        # This would typically include grades, subjects, etc.
+        # For now, return a placeholder
+        return {
+            "student_id": current_user.id,
+            "academic_records": []
+        }
+    except Exception as e:
+        print(f"Error fetching student academic records: {e}")
+        return {"student_id": current_user.id, "academic_records": []}
+
+
+@router.get("/student/attendance")
+def get_student_attendance(current_user: AuthUser = Depends(get_current_user)):
+    """Get attendance records for the logged-in student"""
+    if current_user.role != "student":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    supabase = get_supabase_client()
+    try:
+        # Get student's attendance records
+        attendance_result = supabase.table('student_attendance').select('*').eq('student_id', current_user.id).order('date', desc=True).execute()
+        attendance = attendance_result.data or []
+        
+        return {"attendance": attendance}
+    except Exception as e:
+        print(f"Error fetching student attendance: {e}")
+        return {"attendance": []}
+
+
+@router.get("/student/assignments")
+def get_student_assignments(current_user: AuthUser = Depends(get_current_user)):
+    """Get assignments for the logged-in student"""
+    if current_user.role != "student":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    supabase = get_supabase_client()
+    try:
+        # Get student's assignments
+        # This would typically include homework, projects, etc.
+        # For now, return a placeholder
+        return {
+            "student_id": current_user.id,
+            "assignments": []
+        }
+    except Exception as e:
+        print(f"Error fetching student assignments: {e}")
+        return {"student_id": current_user.id, "assignments": []}
