@@ -3768,3 +3768,232 @@ def get_workload_recommendations(active: int, overdue: int, critical: int) -> li
         recommendations.append("Workload is manageable - continue current pace")
     
     return recommendations
+
+
+@router.get("/analytics/admissions-funnel")
+def get_admissions_funnel(current_user: AuthUser = Depends(get_current_user)):
+    """Get admissions funnel analytics"""
+    if not has_permission(current_user, "admissions:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import datetime, timedelta
+        
+        # Get all leads for the school
+        leads_result = supabase.table('leads').select('*').eq('school_id', current_user.schoolId).execute()
+        leads = leads_result.data or []
+        
+        # Calculate funnel by stage
+        funnel_by_stage = {}
+        stage_order = ['new', 'contacted', 'qualified', 'tour_scheduled', 'assessment_scheduled', 'offer_sent', 'enrolled', 'lost']
+        
+        for stage in stage_order:
+            funnel_by_stage[stage] = len([l for l in leads if l.get('stage') == stage])
+        
+        # Calculate conversion rates
+        funnel_data = []
+        total_leads = len(leads)
+        
+        for stage in stage_order:
+            count = funnel_by_stage[stage]
+            conversion_rate = (count / total_leads * 100) if total_leads > 0 else 0
+            funnel_data.append({
+                "stage": stage,
+                "count": count,
+                "conversion_rate": round(conversion_rate, 2)
+            })
+        
+        # Get funnel for last 30 days
+        thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
+        recent_leads = [l for l in leads if l.get('created_at') and l['created_at'] >= thirty_days_ago]
+        
+        recent_funnel_by_stage = {}
+        for stage in stage_order:
+            recent_funnel_by_stage[stage] = len([l for l in recent_leads if l.get('stage') == stage])
+        
+        recent_funnel_data = []
+        total_recent_leads = len(recent_leads)
+        
+        for stage in stage_order:
+            count = recent_funnel_by_stage[stage]
+            conversion_rate = (count / total_recent_leads * 100) if total_recent_leads > 0 else 0
+            recent_funnel_data.append({
+                "stage": stage,
+                "count": count,
+                "conversion_rate": round(conversion_rate, 2)
+            })
+        
+        # Calculate average time in each stage
+        stage_durations = {}
+        for stage in stage_order:
+            stage_leads = [l for l in leads if l.get('stage') == stage and l.get('created_at')]
+            if stage_leads:
+                total_duration = 0
+                count = 0
+                for lead in stage_leads:
+                    try:
+                        created = datetime.fromisoformat(lead['created_at'])
+                        updated = datetime.fromisoformat(lead['updated_at']) if lead.get('updated_at') else datetime.now()
+                        duration = (updated - created).days
+                        total_duration += duration
+                        count += 1
+                    except:
+                        pass
+                avg_duration = total_duration / count if count > 0 else 0
+                stage_durations[stage] = round(avg_duration, 2)
+            else:
+                stage_durations[stage] = 0
+        
+        # Calculate overall conversion rate (new to enrolled)
+        new_leads = funnel_by_stage.get('new', 0)
+        enrolled_leads = funnel_by_stage.get('enrolled', 0)
+        overall_conversion_rate = (enrolled_leads / new_leads * 100) if new_leads > 0 else 0
+        
+        return {
+            "funnel": {
+                "all_time": {
+                    "total_leads": total_leads,
+                    "by_stage": funnel_data,
+                    "stage_durations": stage_durations,
+                    "overall_conversion_rate": round(overall_conversion_rate, 2)
+                },
+                "last_30_days": {
+                    "total_leads": total_recent_leads,
+                    "by_stage": recent_funnel_data
+                }
+            }
+        }
+    except Exception as e:
+        print(f"Error fetching admissions funnel: {e}")
+        return {"funnel": {"all_time": {"total_leads": 0, "by_stage": [], "stage_durations": {}, "overall_conversion_rate": 0}, "last_30_days": {"total_leads": 0, "by_stage": []}}}
+
+
+@router.get("/analytics/fee-collection")
+def get_fee_collection_analytics(current_user: AuthUser = Depends(get_current_user)):
+    """Get fee collection analytics"""
+    if not has_permission(current_user, "finance:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        from datetime import datetime, timedelta
+        
+        # Get all invoices for the school
+        invoices_result = supabase.table('invoices').select('*').eq('school_id', current_user.schoolId).execute()
+        invoices = invoices_result.data or []
+        
+        # Calculate total amount and collected amount
+        total_amount = sum([inv.get('amount_due', 0) for inv in invoices])
+        total_collected = sum([inv.get('amount_paid', 0) for inv in invoices])
+        
+        # Calculate collection rate
+        collection_rate = (total_collected / total_amount * 100) if total_amount > 0 else 0
+        
+        # Get invoices by status
+        status_counts = {}
+        for invoice in invoices:
+            status = invoice.get('status', 'unknown')
+            status_counts[status] = status_counts.get(status, 0) + 1
+        
+        # Get collections for last 30 days
+        thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
+        payments_result = supabase.table('payments').select('*').eq('school_id', current_user.schoolId).gte('paid_at', thirty_days_ago).execute()
+        payments = payments_result.data or []
+        
+        collections_last_30_days = sum([p.get('amount', 0) for p in payments])
+        
+        # Get collections by month for the last 6 months
+        monthly_collections = {}
+        for i in range(6):
+            month_start = (datetime.now() - timedelta(days=30*i)).replace(day=1)
+            month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+            month_key = month_start.strftime('%Y-%m')
+            
+            month_payments = [p for p in payments if p.get('paid_at') and month_start.isoformat() <= p['paid_at'] <= month_end.isoformat()]
+            monthly_collections[month_key] = sum([p.get('amount', 0) for p in month_payments])
+        
+        # Get overdue amount
+        overdue_invoices = [inv for inv in invoices if inv.get('status') in ['pending', 'part_paid'] and inv.get('due_date') and datetime.fromisoformat(inv['due_date']) < datetime.now()]
+        overdue_amount = sum([inv.get('amount_due', 0) - inv.get('amount_paid', 0) for inv in overdue_invoices])
+        
+        return {
+            "fee_collection": {
+                "total_amount": total_amount,
+                "total_collected": total_collected,
+                "collection_rate": round(collection_rate, 2),
+                "outstanding_amount": total_amount - total_collected,
+                "overdue_amount": overdue_amount,
+                "collections_last_30_days": collections_last_30_days,
+                "by_status": status_counts,
+                "monthly_collections": monthly_collections
+            }
+        }
+    except Exception as e:
+        print(f"Error fetching fee collection analytics: {e}")
+        return {"fee_collection": {"total_amount": 0, "total_collected": 0, "collection_rate": 0, "outstanding_amount": 0, "overdue_amount": 0, "collections_last_30_days": 0, "by_status": {}, "monthly_collections": {}}}
+
+
+@router.get("/analytics/student-statistics")
+def get_student_statistics(current_user: AuthUser = Depends(get_current_user)):
+    """Get student statistics and trends"""
+    if not has_permission(current_user, "students:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    supabase = get_supabase_client()
+    try:
+        # Get all students for the school
+        students_result = supabase.table('students').select('*').eq('school_id', current_user.schoolId).execute()
+        students = students_result.data or []
+        
+        # Get students by class
+        class_counts = {}
+        for student in students:
+            class_id = student.get('class_id')
+            if class_id:
+                class_counts[class_id] = class_counts.get(class_id, 0) + 1
+        
+        # Get class names
+        class_names = {}
+        if class_counts:
+            classes_result = supabase.table('classes').select('*').in_('id', list(class_counts.keys())).execute()
+            for cls in classes_result.data or []:
+                class_names[cls['id']] = cls.get('name', 'Unknown')
+        
+        # Format class statistics
+        class_stats = []
+        for class_id, count in class_counts.items():
+            class_stats.append({
+                "class_id": class_id,
+                "class_name": class_names.get(class_id, 'Unknown'),
+                "student_count": count
+            })
+        
+        # Get enrollment trends (by month for last 6 months)
+        from datetime import datetime, timedelta
+        monthly_enrollments = {}
+        for i in range(6):
+            month_start = (datetime.now() - timedelta(days=30*i)).replace(day=1)
+            month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+            month_key = month_start.strftime('%Y-%m')
+            
+            month_students = [s for s in students if s.get('enrollment_date') and month_start.isoformat() <= s['enrollment_date'] <= month_end.isoformat()]
+            monthly_enrollments[month_key] = len(month_students)
+        
+        # Get gender distribution
+        gender_counts = {}
+        for student in students:
+            gender = student.get('gender', 'unknown')
+            gender_counts[gender] = gender_counts.get(gender, 0) + 1
+        
+        # Calculate total students
+        total_students = len(students)
+        
+        return {
+            "student_statistics": {
+                "total_students": total_students,
+                "by_class": class_stats,
+                "gender_distribution": gender_counts,
+                "monthly_enrollments": monthly_enrollments
+            }
+        }
+    except Exception as e:
+        print(f"Error fetching student statistics: {e}")
+        return {"student_statistics": {"total_students": 0, "by_class": [], "gender_distribution": {}, "monthly_enrollments": {}}}
