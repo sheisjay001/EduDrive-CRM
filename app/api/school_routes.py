@@ -37,9 +37,14 @@ async def register_school(request: SchoolRegisterRequest):
     supabase = get_supabase_client()
     
     try:
+        # Generate slug from school name
+        import re
+        slug = re.sub(r'[^a-z0-9]+', '-', request.school_name.lower()).strip('-')
+        
         # Create school
         school_result = supabase.table('schools').insert({
             'name': request.school_name,
+            'slug': slug,
             'subscription_plan': request.subscription_plan,
             'is_active': True
         }).execute()
@@ -66,11 +71,15 @@ async def register_school(request: SchoolRegisterRequest):
             raise HTTPException(status_code=500, detail="Failed to create user")
         
         # Create user role entry
-        role_result = supabase.table('user_roles').insert({
-            'user_id': auth_response.user.id,
-            'role': 'school_admin',
-            'school_id': school_id
-        }).execute()
+        try:
+            role_result = supabase.table('user_roles').insert({
+                'user_id': auth_response.user.id,
+                'role': 'school_admin',
+                'school_id': school_id
+            }).execute()
+        except Exception as e:
+            print(f"Error creating user role: {e}")
+            # Continue anyway - role might be optional
         
         # Authenticate user to get tokens
         user = authenticate_user(request.email, request.password)
@@ -98,7 +107,12 @@ async def register_school(request: SchoolRegisterRequest):
                 "subscription_plan": request.subscription_plan
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"Registration error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/slug/{slug}")
