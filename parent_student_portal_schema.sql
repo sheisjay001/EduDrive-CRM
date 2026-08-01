@@ -190,13 +190,13 @@ BEGIN
     IF school_id IS NOT NULL THEN
         -- Only insert sample data if students exist in auth.users
         IF student1_auth_id IS NOT NULL THEN
-            -- Check if student record exists in students table
-            SELECT id INTO student1_record_id FROM students WHERE user_id = student1_auth_id LIMIT 1;
+            -- Check if student record exists in students table by email
+            SELECT id INTO student1_record_id FROM students WHERE email = 'student1@edudrive.demo' LIMIT 1;
             
-            -- If no student record exists, create one
+            -- If no student record exists, create one using existing columns
             IF student1_record_id IS NULL THEN
-                INSERT INTO students (id, user_id, school_id, name, email, status, enrollment_date, created_at)
-                VALUES (gen_random_uuid(), student1_auth_id, school_id, 'Michael Student', 'student1@edudrive.demo', 'active', CURRENT_DATE, NOW())
+                INSERT INTO students (id, school_id, first_name, last_name, email, status, created_at)
+                VALUES (gen_random_uuid(), school_id, 'Michael', 'Student', 'student1@edudrive.demo', 'active', NOW())
                 RETURNING id INTO student1_record_id;
                 RAISE NOTICE 'Created student record for student1@edudrive.demo';
             END IF;
@@ -223,13 +223,13 @@ BEGIN
         END IF;
         
         IF student2_auth_id IS NOT NULL THEN
-            -- Check if student record exists in students table
-            SELECT id INTO student2_record_id FROM students WHERE user_id = student2_auth_id LIMIT 1;
+            -- Check if student record exists in students table by email
+            SELECT id INTO student2_record_id FROM students WHERE email = 'student2@edudrive.demo' LIMIT 1;
             
-            -- If no student record exists, create one
+            -- If no student record exists, create one using existing columns
             IF student2_record_id IS NULL THEN
-                INSERT INTO students (id, user_id, school_id, name, email, status, enrollment_date, created_at)
-                VALUES (gen_random_uuid(), student2_auth_id, school_id, 'Sarah Student', 'student2@edudrive.demo', 'active', CURRENT_DATE, NOW())
+                INSERT INTO students (id, school_id, first_name, last_name, email, status, created_at)
+                VALUES (gen_random_uuid(), school_id, 'Sarah', 'Student', 'student2@edudrive.demo', 'active', NOW())
                 RETURNING id INTO student2_record_id;
                 RAISE NOTICE 'Created student record for student2@edudrive.demo';
             END IF;
