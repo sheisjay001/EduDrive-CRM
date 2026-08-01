@@ -147,54 +147,78 @@ END $$;
 DO $$
 DECLARE
     school_id UUID;
-    student1_id UUID;
-    student2_id UUID;
+    student1_auth_id UUID;
+    student2_auth_id UUID;
+    student1_record_id UUID;
+    student2_record_id UUID;
 BEGIN
     SELECT id INTO school_id FROM schools LIMIT 1;
-    SELECT id INTO student1_id FROM auth.users WHERE email = 'student1@edudrive.demo' LIMIT 1;
-    SELECT id INTO student2_id FROM auth.users WHERE email = 'student2@edudrive.demo' LIMIT 1;
+    SELECT id INTO student1_auth_id FROM auth.users WHERE email = 'student1@edudrive.demo' LIMIT 1;
+    SELECT id INTO student2_auth_id FROM auth.users WHERE email = 'student2@edudrive.demo' LIMIT 1;
     
     IF school_id IS NOT NULL THEN
-        -- Only insert sample data if students exist
-        IF student1_id IS NOT NULL THEN
+        -- Only insert sample data if students exist in auth.users
+        IF student1_auth_id IS NOT NULL THEN
+            -- Check if student record exists in students table
+            SELECT id INTO student1_record_id FROM students WHERE user_id = student1_auth_id LIMIT 1;
+            
+            -- If no student record exists, create one
+            IF student1_record_id IS NULL THEN
+                INSERT INTO students (id, user_id, school_id, name, email, status, enrollment_date, created_at)
+                VALUES (gen_random_uuid(), student1_auth_id, school_id, 'Michael Student', 'student1@edudrive.demo', 'active', CURRENT_DATE, NOW())
+                RETURNING id INTO student1_record_id;
+                RAISE NOTICE 'Created student record for student1@edudrive.demo';
+            END IF;
+            
             -- Sample Student Attendance Records for Student 1
             INSERT INTO student_attendance (student_id, date, status, notes, recorded_by, school_id)
             VALUES
-                (student1_id, CURRENT_DATE - INTERVAL '5 days', 'present', NULL, student1_id, school_id),
-                (student1_id, CURRENT_DATE - INTERVAL '4 days', 'present', NULL, student1_id, school_id),
-                (student1_id, CURRENT_DATE - INTERVAL '3 days', 'late', 'Arrived 15 minutes late', student1_id, school_id),
-                (student1_id, CURRENT_DATE - INTERVAL '2 days', 'present', NULL, student1_id, school_id),
-                (student1_id, CURRENT_DATE - INTERVAL '1 day', 'absent', 'Sick leave', student1_id, school_id)
+                (student1_record_id, CURRENT_DATE - INTERVAL '5 days', 'present', NULL, student1_auth_id, school_id),
+                (student1_record_id, CURRENT_DATE - INTERVAL '4 days', 'present', NULL, student1_auth_id, school_id),
+                (student1_record_id, CURRENT_DATE - INTERVAL '3 days', 'late', 'Arrived 15 minutes late', student1_auth_id, school_id),
+                (student1_record_id, CURRENT_DATE - INTERVAL '2 days', 'present', NULL, student1_auth_id, school_id),
+                (student1_record_id, CURRENT_DATE - INTERVAL '1 day', 'absent', 'Sick leave', student1_auth_id, school_id)
             ON CONFLICT DO NOTHING;
             
             -- Sample Student Assignments for Student 1
             INSERT INTO student_assignments (student_id, title, description, subject, due_date, status, assigned_by, school_id)
             VALUES
-                (student1_id, 'Math Homework Chapter 5', 'Complete exercises 1-20 from Chapter 5', 'Mathematics', CURRENT_DATE + INTERVAL '3 days', 'pending', student1_id, school_id),
-                (student1_id, 'Science Project', 'Create a presentation on renewable energy', 'Science', CURRENT_DATE + INTERVAL '7 days', 'in_progress', student1_id, school_id),
-                (student1_id, 'English Essay', 'Write a 500-word essay on climate change', 'English', CURRENT_DATE - INTERVAL '2 days', 'completed', student1_id, school_id)
+                (student1_record_id, 'Math Homework Chapter 5', 'Complete exercises 1-20 from Chapter 5', 'Mathematics', CURRENT_DATE + INTERVAL '3 days', 'pending', student1_auth_id, school_id),
+                (student1_record_id, 'Science Project', 'Create a presentation on renewable energy', 'Science', CURRENT_DATE + INTERVAL '7 days', 'in_progress', student1_auth_id, school_id),
+                (student1_record_id, 'English Essay', 'Write a 500-word essay on climate change', 'English', CURRENT_DATE - INTERVAL '2 days', 'completed', student1_auth_id, school_id)
             ON CONFLICT DO NOTHING;
             
             RAISE NOTICE 'Sample data inserted for student1@edudrive.demo';
         END IF;
         
-        IF student2_id IS NOT NULL THEN
+        IF student2_auth_id IS NOT NULL THEN
+            -- Check if student record exists in students table
+            SELECT id INTO student2_record_id FROM students WHERE user_id = student2_auth_id LIMIT 1;
+            
+            -- If no student record exists, create one
+            IF student2_record_id IS NULL THEN
+                INSERT INTO students (id, user_id, school_id, name, email, status, enrollment_date, created_at)
+                VALUES (gen_random_uuid(), student2_auth_id, school_id, 'Sarah Student', 'student2@edudrive.demo', 'active', CURRENT_DATE, NOW())
+                RETURNING id INTO student2_record_id;
+                RAISE NOTICE 'Created student record for student2@edudrive.demo';
+            END IF;
+            
             -- Sample Student Attendance Records for Student 2
             INSERT INTO student_attendance (student_id, date, status, notes, recorded_by, school_id)
             VALUES
-                (student2_id, CURRENT_DATE - INTERVAL '5 days', 'present', NULL, student2_id, school_id),
-                (student2_id, CURRENT_DATE - INTERVAL '4 days', 'present', NULL, student2_id, school_id),
-                (student2_id, CURRENT_DATE - INTERVAL '3 days', 'present', NULL, student2_id, school_id),
-                (student2_id, CURRENT_DATE - INTERVAL '2 days', 'excused', 'Medical appointment', student2_id, school_id),
-                (student2_id, CURRENT_DATE - INTERVAL '1 day', 'present', NULL, student2_id, school_id)
+                (student2_record_id, CURRENT_DATE - INTERVAL '5 days', 'present', NULL, student2_auth_id, school_id),
+                (student2_record_id, CURRENT_DATE - INTERVAL '4 days', 'present', NULL, student2_auth_id, school_id),
+                (student2_record_id, CURRENT_DATE - INTERVAL '3 days', 'present', NULL, student2_auth_id, school_id),
+                (student2_record_id, CURRENT_DATE - INTERVAL '2 days', 'excused', 'Medical appointment', student2_auth_id, school_id),
+                (student2_record_id, CURRENT_DATE - INTERVAL '1 day', 'present', NULL, student2_auth_id, school_id)
             ON CONFLICT DO NOTHING;
             
             -- Sample Student Assignments for Student 2
             INSERT INTO student_assignments (student_id, title, description, subject, due_date, status, assigned_by, school_id)
             VALUES
-                (student2_id, 'History Report', 'Research and write about World War II', 'History', CURRENT_DATE + INTERVAL '5 days', 'pending', student2_id, school_id),
-                (student2_id, 'Math Quiz Preparation', 'Study for upcoming algebra quiz', 'Mathematics', CURRENT_DATE + INTERVAL '2 days', 'in_progress', student2_id, school_id),
-                (student2_id, 'Geography Map Assignment', 'Label countries on world map', 'Geography', CURRENT_DATE - INTERVAL '1 day', 'completed', student2_id, school_id)
+                (student2_record_id, 'History Report', 'Research and write about World War II', 'History', CURRENT_DATE + INTERVAL '5 days', 'pending', student2_auth_id, school_id),
+                (student2_record_id, 'Math Quiz Preparation', 'Study for upcoming algebra quiz', 'Mathematics', CURRENT_DATE + INTERVAL '2 days', 'in_progress', student2_auth_id, school_id),
+                (student2_record_id, 'Geography Map Assignment', 'Label countries on world map', 'Geography', CURRENT_DATE - INTERVAL '1 day', 'completed', student2_auth_id, school_id)
             ON CONFLICT DO NOTHING;
             
             RAISE NOTICE 'Sample data inserted for student2@edudrive.demo';
