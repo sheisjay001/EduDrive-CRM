@@ -48,6 +48,35 @@ All users login with:
 
 ---
 
+### School Admin
+**Email Example:** `schooladmin@greenfieldcollege.ng`
+
+**After Login:**
+- Full access to school-specific modules
+- Can manage school staff accounts and permissions
+- Can manage students and families
+- Can view financial reports for their school
+- Can configure school branding and settings
+- Can manage fee structures and terms
+
+**Accessible Pages:**
+- Dashboard (school-specific metrics)
+- Admissions (full pipeline management)
+- Families (all records)
+- Students (all records)
+- Finance (full access)
+- Messaging (all features)
+- Helpdesk (all tickets)
+- Staff (management)
+- Reports (all reports)
+- Settings (full configuration)
+
+**Restricted Access:**
+- Cannot access other schools' data
+- Cannot access platform-level settings (Super Admin only)
+
+---
+
 ### Admissions Officer
 **Email Example:** `admissions@greenfieldcollege.ng`
 
@@ -112,6 +141,32 @@ All users login with:
 - Students (assigned students only)
 - Parents (view student parents)
 - Messaging (send parent communications)
+
+**Restricted Access:**
+- Cannot access financial data
+- Cannot access admissions pipeline
+- Cannot access staff management
+- Cannot access system settings
+- Cannot view full reports
+
+---
+
+### Help Desk Officer
+**Email Example:** `helpdesk@greenfieldcollege.ng`
+
+**After Login:**
+- Can manage parent complaints and support tickets
+- Can assign tickets to appropriate staff
+- Can track SLA deadlines and response times
+- Can record ticket resolutions
+- Can view parent and family information for support context
+
+**Accessible Pages:**
+- Dashboard (helpdesk metrics only)
+- Helpdesk (full ticket management)
+- Families (view for support context)
+- Parents (view for support context)
+- Messaging (send support communications)
 
 **Restricted Access:**
 - Cannot access financial data
