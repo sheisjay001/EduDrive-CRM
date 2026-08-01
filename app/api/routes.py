@@ -6,6 +6,7 @@ from app.core.auth import (
     create_tokens_for_user,
     decode_refresh_token,
     get_current_user,
+    require_role,
     require_any_role,
     has_permission,
 )
