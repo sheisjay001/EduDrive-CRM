@@ -1866,3 +1866,65 @@ def get_user_audit_logs(user_id: str, current_user: AuthUser = Depends(get_curre
     except Exception as e:
         print(f"Error fetching user audit logs: {e}")
         return {"logs": []}
+
+
+@router.post("/auth/refresh")
+def refresh_token(payload: AuthRefreshRequest) -> AuthResponse:
+    """Refresh access token using refresh token with device/session tracking"""
+    supabase = get_supabase_client()
+    try:
+        # Verify refresh token and get user info
+        from app.core.security import verify_token
+        token_data = verify_token(payload.refresh_token)
+        
+        if not token_data or token_data.get('token_type') != 'refresh':
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+        
+        # Get user from database
+        user_result = supabase.table('users').select('*').eq('id', token_data.get('sub')).execute()
+        if not user_result.data:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        user = user_result.data[0]
+        
+        # Get user role
+        role_result = supabase.table('user_roles').select('role').eq('user_id', user['id']).execute()
+        role = role_result.data[0]['role'] if role_result.data else 'school_admin'
+        
+        # Log the refresh activity for session tracking
+        supabase.table('audit_logs').insert({
+            'school_id': user['school_id'],
+            'user_id': user['id'],
+            'action': 'token_refresh',
+            'entity_type': 'auth',
+            'entity_id': user['id'],
+            'details': {
+                'device_info': payload.get('device_info', {}),
+                'ip_address': payload.get('ip_address')
+            },
+            'created_at': datetime.now().isoformat()
+        }).execute()
+        
+        # Create new tokens
+        auth_user = AuthUser(
+            id=user['id'],
+            schoolId=user['school_id'],
+            role=role,
+            fullName=user['full_name'],
+            email=user['email'],
+        )
+        
+        access_token, refresh_token = create_tokens_for_user(auth_user)
+        
+        return AuthResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_type="bearer",
+            expires_in=3600,
+            user=auth_user,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error refreshing token: {e}")
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
