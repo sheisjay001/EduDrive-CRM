@@ -80,7 +80,7 @@ export function AppShell({ title, eyebrow, description, children }: AppShellProp
           <nav className="space-y-2">
             {navigation.map((item) => {
               const Icon = item.icon;
-              const active = pathname === item.href;
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
               return (
                 <Link

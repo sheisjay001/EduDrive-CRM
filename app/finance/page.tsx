@@ -31,7 +31,7 @@ export default function FinancePage() {
 
   const handleSaveEdit = async (invoiceId: string) => {
     try {
-      const response = await fetch(`${API_URL}/finance/invoices/${invoiceId}`, {
+      const response = await fetch(`${API_URL}/invoices/${invoiceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token")}` },
         body: JSON.stringify(editFormData),
@@ -45,7 +45,7 @@ export default function FinancePage() {
   const handleDelete = async (invoiceId: string) => {
     if (!confirm("Delete this invoice?")) return;
     try {
-      const response = await fetch(`${API_URL}/finance/invoices/${invoiceId}`, {
+      const response = await fetch(`${API_URL}/invoices/${invoiceId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
       });
@@ -70,6 +70,14 @@ export default function FinancePage() {
         <LoadingPanel />
       ) : (
         <>
+          <div className="flex flex-wrap gap-3">
+            <Button asChild variant="secondary">
+              <Link href="/finance/payments">Payment desk</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/finance/debtors">Debtors dashboard</Link>
+            </Button>
+          </div>
           <KpiGrid items={kpis} />
           <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
             <DataTable

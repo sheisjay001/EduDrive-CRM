@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { AppShell } from "@/components/shell/app-shell";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DataTable, LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
 import { useMessagingQuery } from "@/hooks/use-crm-query";
@@ -19,6 +21,14 @@ export default function MessagingPage() {
         <LoadingPanel />
       ) : (
         <>
+          <div className="flex flex-wrap gap-3">
+            <Button asChild variant="secondary">
+              <Link href="/messaging/broadcasts">Broadcast center</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/messaging/templates">Template library</Link>
+            </Button>
+          </div>
           <div className="grid gap-4 xl:grid-cols-3">
             {data.metrics.map((metric) => (
               <Card key={metric.channel}>

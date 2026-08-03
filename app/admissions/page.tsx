@@ -134,10 +134,15 @@ export default function AdmissionsPage() {
                 List View
               </Button>
             </div>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Lead
-            </Button>
+            <div className="flex gap-2">
+              <Button asChild variant="secondary">
+                <Link href="/admissions/calendar">Schedule Center</Link>
+              </Button>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                New Lead
+              </Button>
+            </div>
           </div>
 
           {viewMode === "kanban" ? (
