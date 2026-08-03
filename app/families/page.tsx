@@ -27,8 +27,8 @@ export default function FamiliesPage() {
   const handleEdit = (family: any) => {
     setEditingFamily(family.id);
     setEditFormData({
-      household_name: family.householdName || family.familyName || "",
-      billing_contact_parent_id: family.billingContactParentId || "",
+      household_name: family.household_name || family.householdName || "",
+      billing_contact_parent_id: family.billing_contact_parent_id || family.billingContactParentId || "",
     });
   };
 

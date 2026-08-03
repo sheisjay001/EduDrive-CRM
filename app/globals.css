@@ -55,3 +55,135 @@ a {
     radial-gradient(circle at 50% 100%, rgba(11, 143, 106, 0.12) 0, transparent 30%);
   mix-blend-mode: screen;
 }
+
+/* Mobile Responsive Enhancements */
+@media (max-width: 768px) {
+  /* Touch-friendly tap targets */
+  button, a, input, select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Larger touch targets for interactive elements */
+  .touch-target {
+    padding: 12px 16px;
+    min-height: 48px;
+  }
+  
+  /* Mobile-optimized spacing */
+  .mobile-spacing {
+    padding: 16px;
+  }
+  
+  /* Mobile-optimized cards */
+  .mobile-card {
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  
+  /* Mobile navigation */
+  .mobile-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--background);
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    z-index: 50;
+  }
+  
+  /* Hide desktop elements on mobile */
+  .desktop-only {
+    display: none !important;
+  }
+  
+  /* Mobile-only elements */
+  .mobile-only {
+    display: block !important;
+  }
+  
+  /* Mobile-optimized tables */
+  table {
+    font-size: 14px;
+  }
+  
+  table th, table td {
+    padding: 8px 4px;
+  }
+  
+  /* Mobile-optimized forms */
+  input, select, textarea {
+    font-size: 16px; /* Prevents iOS zoom */
+  }
+  
+  /* Mobile-optimized grid */
+  .mobile-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+@media (min-width: 769px) {
+  /* Hide mobile elements on desktop */
+  .mobile-only {
+    display: none !important;
+  }
+  
+  /* Desktop-only elements */
+  .desktop-only {
+    display: block !important;
+  }
+}
+
+/* Touch-optimized interactions */
+@media (hover: none) and (pointer: coarse) {
+  /* Remove hover effects on touch devices */
+  button:hover, a:hover {
+    transform: none;
+  }
+  
+  /* Add active state feedback */
+  button:active, a:active {
+    opacity: 0.7;
+    transform: scale(0.98);
+  }
+  
+  /* Smooth scrolling for touch */
+  html {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Mobile-specific utilities */
+.mobile-overflow-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-overflow-y {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--background);
+}
+
+.mobile-safe-area {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* Mobile-optimized typography */
+@media (max-width: 768px) {
+  h1 { font-size: 24px; }
+  h2 { font-size: 20px; }
+  h3 { font-size: 18px; }
+  h4 { font-size: 16px; }
+  p, span, div { font-size: 14px; }
+}

@@ -9,8 +9,7 @@ import { DataTable, LoadingPanel } from "@/components/dashboard/ops-primitives";
 import { useHelpdeskQuery } from "@/hooks/use-crm-query";
 import { Edit, Trash2, Save, X, Plus } from "lucide-react";
 import { getUser } from "@/services/auth-storage";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
+import { apiClient } from "@/services/api-client";
 
 export default function HelpdeskPage() {
   const { data, isLoading, refetch } = useHelpdeskQuery();
@@ -31,12 +30,10 @@ export default function HelpdeskPage() {
 
   const handleSaveEdit = async (ticketId: string) => {
     try {
-      const response = await fetch(`${API_URL}/helpdesk/tickets/${ticketId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token")}` },
-        body: JSON.stringify(editFormData),
-      });
-      if (response.ok) { setEditingTicket(null); refetch(); alert("Ticket updated"); }
+      await apiClient.updateTicket(ticketId, editFormData);
+      setEditingTicket(null);
+      refetch();
+      alert("Ticket updated");
     } catch { alert("Error updating ticket"); }
   };
 
@@ -45,22 +42,19 @@ export default function HelpdeskPage() {
   const handleDelete = async (ticketId: string) => {
     if (!confirm("Delete this ticket?")) return;
     try {
-      const response = await fetch(`${API_URL}/helpdesk/tickets/${ticketId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
-      });
-      if (response.ok) { refetch(); alert("Ticket deleted"); }
+      await apiClient.deleteTicket(ticketId);
+      refetch();
+      alert("Ticket deleted");
     } catch { alert("Error deleting ticket"); }
   };
 
   const handleAdd = async () => {
     try {
-      const response = await fetch(`${API_URL}/helpdesk/tickets`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token")}` },
-        body: JSON.stringify(addFormData),
-      });
-      if (response.ok) { setShowAddForm(false); setAddFormData({ subject: "", parent_id: "", priority: "", assignee_id: "" }); refetch(); alert("Ticket created"); }
+      await apiClient.createTicket(addFormData);
+      setShowAddForm(false);
+      setAddFormData({ subject: "", parent_id: "", priority: "", assignee_id: "" });
+      refetch();
+      alert("Ticket created");
     } catch { alert("Error creating ticket"); }
   };
 

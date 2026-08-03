@@ -10,7 +10,7 @@ import {
   staffData,
   studentsData,
 } from "@/services/mock-data";
-import { clearAuthTokens, getAccessToken, saveAuthTokens, saveUser } from "@/services/auth-storage";
+import { clearAuthTokens, getAccessToken, getRefreshToken, saveAuthTokens, saveUser } from "@/services/auth-storage";
 import type {
   AdmissionsResponse,
   AuthPayload,
@@ -45,22 +45,107 @@ import type {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
+let isRefreshing = false;
+let refreshSubscribers: Array<(token: string) => void> = [];
+
+function subscribeTokenRefresh(callback: (token: string) => void) {
+  refreshSubscribers.push(callback);
+}
+
+function onTokenRefreshed(token: string) {
+  refreshSubscribers.forEach(callback => callback(token));
+  refreshSubscribers = [];
+}
+
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Refresh failed");
+    }
+
+    const data = await response.json();
+    if (data.access_token) {
+      saveAuthTokens(data.access_token, data.refresh_token || refreshToken);
+      if (data.user) {
+        saveUser(data.user);
+      }
+      return data.access_token;
+    }
+    return null;
+  } catch (error) {
+    console.error("Token refresh failed:", error);
+    clearAuthTokens();
+    return null;
+  }
+}
+
 async function request<T>(path: string, fallback: T, init?: RequestInit): Promise<T> {
-  const accessToken = getAccessToken();
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-    cache: "no-store",
-  });
+  let accessToken = getAccessToken();
+  
+  const makeRequest = async (token: string | null): Promise<Response> => {
+    return fetch(`${API_URL}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init?.headers ?? {}),
+      },
+      cache: "no-store",
+    });
+  };
+
+  let response = await makeRequest(accessToken);
+
+  if (response.status === 401 && accessToken) {
+    if (!isRefreshing) {
+      isRefreshing = true;
+      const newToken = await refreshAccessToken();
+      isRefreshing = false;
+      
+      if (newToken) {
+        onTokenRefreshed(newToken);
+        accessToken = newToken;
+        response = await makeRequest(newToken);
+      } else {
+        // Refresh failed, clear tokens and redirect to login
+        clearAuthTokens();
+        if (typeof window !== "undefined") {
+          window.location.href = "/login";
+        }
+        throw new Error("Session expired");
+      }
+    } else {
+      // Wait for refresh to complete
+      return new Promise((resolve, reject) => {
+        subscribeTokenRefresh((token: string) => {
+          makeRequest(token)
+            .then(res => {
+              if (!res.ok) {
+                reject(new Error(`Request failed with status ${res.status}`));
+              } else {
+                res.json().then(data => resolve(data as T));
+              }
+            })
+            .catch(reject);
+        });
+      });
+    }
+  }
 
   if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthTokens();
-    }
     throw new Error(`Request failed with status ${response.status}`);
   }
 
@@ -204,5 +289,34 @@ export const apiClient = {
   },
   getStudent(studentId: string) {
     return request<StudentDetail>(`/students/${studentId}`, {} as StudentDetail);
+  },
+  updateTicket(ticketId: string, payload: Record<string, unknown>) {
+    return request<{ id: string }>(
+      `/tickets/${ticketId}`,
+      {} as { id: string },
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  createTicket(payload: Record<string, unknown>) {
+    return request<{ id: string }>(
+      "/tickets",
+      {} as { id: string },
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  deleteTicket(ticketId: string) {
+    return request<{ success: boolean }>(
+      `/tickets/${ticketId}`,
+      {} as { success: boolean },
+      {
+        method: "DELETE",
+      },
+    );
   },
 };

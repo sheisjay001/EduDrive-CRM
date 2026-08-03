@@ -49,10 +49,20 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
     const slugFromPath = pathParts[0];
 
     if (slugFromPath && slugFromPath !== "login" && slugFromPath !== "signup") {
-      setSchoolSlug(slugFromPath);
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          setSchoolSlug(slugFromPath);
+        }
+      }, 0);
     }
 
-    setIsLoading(false);
+    // Use setTimeout to avoid synchronous setState in effect
+    setTimeout(() => {
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
+    }, 0);
 
     return () => {
       isMountedRef.current = false;
@@ -60,7 +70,7 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (schoolSlug) {
+    if (schoolSlug && isMountedRef.current) {
       fetchSchoolInfo(schoolSlug);
     }
   }, [schoolSlug]);

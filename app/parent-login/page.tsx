@@ -56,7 +56,7 @@ export default function ParentLoginPage() {
             Parent Portal
           </CardTitle>
           <CardDescription className="text-center">
-            Sign in to access your children's information
+            Sign in to access your children&apos;s information
           </CardDescription>
         </CardHeader>
         <CardContent>
