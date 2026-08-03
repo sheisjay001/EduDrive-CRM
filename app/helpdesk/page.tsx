@@ -11,11 +11,14 @@ import { Edit, Trash2, Save, X, Plus } from "lucide-react";
 import { getUser } from "@/services/auth-storage";
 import { apiClient } from "@/services/api-client";
 
+const TICKET_STATUSES = ["Open", "In Progress", "Pending", "Resolved", "Closed"];
+const TICKET_PRIORITIES = ["Low", "Medium", "High", "Urgent"];
+
 export default function HelpdeskPage() {
   const { data, isLoading, refetch } = useHelpdeskQuery();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingTicket, setEditingTicket] = useState<string | null>(null);
-  const [editFormData, setEditFormData] = useState({});
+  const [editFormData, setEditFormData] = useState({ subject: "", priority: "", status: "" });
   const [addFormData, setAddFormData] = useState({ subject: "", parent_id: "", priority: "", assignee_id: "" });
 
   const user = getUser();
@@ -34,10 +37,13 @@ export default function HelpdeskPage() {
       setEditingTicket(null);
       refetch();
       alert("Ticket updated");
-    } catch { alert("Error updating ticket"); }
+    } catch (error) {
+      console.error("Error updating ticket:", error);
+      alert("Error updating ticket");
+    }
   };
 
-  const handleCancelEdit = () => { setEditingTicket(null); setEditFormData({}); };
+  const handleCancelEdit = () => { setEditingTicket(null); setEditFormData({ subject: "", priority: "", status: "" }); };
 
   const handleDelete = async (ticketId: string) => {
     if (!confirm("Delete this ticket?")) return;
@@ -94,13 +100,15 @@ export default function HelpdeskPage() {
               {ticket.id}
             </Link>,
             editingTicket === ticket.id ? (
-              <input type="text" defaultValue={ticket.subject} onChange={(e) => setEditFormData({ ...editFormData, subject: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white" />
+              <input type="text" value={editFormData.subject} onChange={(e) => setEditFormData({ ...editFormData, subject: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white" />
             ) : (
               ticket.subject
             ),
             ticket.parent,
             editingTicket === ticket.id ? (
-              <input type="text" defaultValue={ticket.priority} onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white" />
+              <select value={editFormData.priority} onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white">
+                {TICKET_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
             ) : (
               <Badge key={`${ticket.id}-priority`} tone={ticket.priority === "Urgent" ? "danger" : ticket.priority === "High" ? "warn" : "neutral"}>
                 {ticket.priority}
@@ -109,7 +117,9 @@ export default function HelpdeskPage() {
             ticket.assignee,
             ticket.sla,
             editingTicket === ticket.id ? (
-              <input type="text" defaultValue={ticket.status} onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white" />
+              <select value={editFormData.status} onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white">
+                {TICKET_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
             ) : (
               <Badge key={`${ticket.id}-status`} tone={ticket.status === "Resolved" ? "good" : "warn"}>
                 {ticket.status}

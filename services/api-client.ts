@@ -290,6 +290,25 @@ export const apiClient = {
   getStudent(studentId: string) {
     return request<StudentDetail>(`/students/${studentId}`, {} as StudentDetail);
   },
+  updateStudent(studentId: string, payload: Record<string, unknown>) {
+    return request<{ id: string }>(
+      `/students/${studentId}`,
+      {} as { id: string },
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  deleteStudent(studentId: string) {
+    return request<{ success: boolean }>(
+      `/students/${studentId}`,
+      {} as { success: boolean },
+      {
+        method: "DELETE",
+      },
+    );
+  },
   updateTicket(ticketId: string, payload: Record<string, unknown>) {
     return request<{ id: string }>(
       `/tickets/${ticketId}`,
@@ -318,5 +337,43 @@ export const apiClient = {
         method: "DELETE",
       },
     );
+  },
+  importStudentsCSV(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const accessToken = getAccessToken();
+    return fetch(`${API_URL}/students/import/csv`, {
+      method: 'POST',
+      headers: {
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: formData,
+    }).then(async (response) => {
+      if (!response.ok) {
+        if (response.status === 401) {
+          const newToken = await refreshAccessToken();
+          if (newToken) {
+            const retryResponse = await fetch(`${API_URL}/students/import/csv`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${newToken}`,
+              },
+              body: formData,
+            });
+            if (retryResponse.ok) {
+              return await retryResponse.json();
+            }
+          }
+          clearAuthTokens();
+          if (typeof window !== "undefined") {
+            window.location.href = "/login";
+          }
+          throw new Error("Session expired");
+        }
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+      return await response.json();
+    });
   },
 };

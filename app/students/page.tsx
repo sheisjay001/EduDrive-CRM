@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable, LoadingPanel } from "@/components/dashboard/ops-primitives";
 import { Upload, Plus, Edit, Trash2, Save, X } from "lucide-react";
 import { getUser } from "@/services/auth-storage";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
+import { apiClient } from "@/services/api-client";
 
 export default function StudentsPage() {
   const [students, setStudents] = useState([]);
@@ -29,26 +28,11 @@ export default function StudentsPage() {
     if (!file) return;
 
     setIsImporting(true);
-    const formData = new FormData();
-    formData.append('file', file);
 
     try {
-      const response = await fetch(`${API_URL}/students/import/csv`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        },
-        body: formData,
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        alert(`Successfully imported ${result.students_created} students`);
-        // Refresh students list
-      } else {
-        const error = await response.json();
-        alert(`Failed to import students: ${error.detail || 'Unknown error'}`);
-      }
+      const result = await apiClient.importStudentsCSV(file);
+      alert(`Successfully imported ${result.students_created} students`);
+      // Refresh students list
     } catch (error) {
       console.error('Error importing students:', error);
       alert('Error importing students');
@@ -72,22 +56,10 @@ export default function StudentsPage() {
 
   const handleSaveEdit = async (studentId: string) => {
     try {
-      const response = await fetch(`${API_URL}/students/${studentId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        },
-        body: JSON.stringify(editFormData),
-      });
-
-      if (response.ok) {
-        setEditingStudent(null);
-        alert('Student updated successfully');
-        // Refresh students list
-      } else {
-        alert('Failed to update student');
-      }
+      await apiClient.updateStudent(studentId, editFormData);
+      setEditingStudent(null);
+      alert('Student updated successfully');
+      // Refresh students list
     } catch (error) {
       alert('Error updating student');
     }
@@ -102,19 +74,9 @@ export default function StudentsPage() {
     if (!confirm('Are you sure you want to delete this student?')) return;
 
     try {
-      const response = await fetch(`${API_URL}/students/${studentId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        },
-      });
-
-      if (response.ok) {
-        alert('Student deleted successfully');
-        // Refresh students list
-      } else {
-        alert('Failed to delete student');
-      }
+      await apiClient.deleteStudent(studentId);
+      alert('Student deleted successfully');
+      // Refresh students list
     } catch (error) {
       alert('Error deleting student');
     }
