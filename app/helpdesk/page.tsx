@@ -33,13 +33,15 @@ export default function HelpdeskPage() {
 
   const handleSaveEdit = async (ticketId: string) => {
     try {
-      await apiClient.updateTicket(ticketId, editFormData);
+      console.log("Updating ticket:", ticketId, "with data:", editFormData);
+      const result = await apiClient.updateTicket(ticketId, editFormData);
+      console.log("Update result:", result);
       setEditingTicket(null);
       refetch();
       alert("Ticket updated");
     } catch (error) {
       console.error("Error updating ticket:", error);
-      alert("Error updating ticket");
+      alert(`Error updating ticket: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -106,8 +108,12 @@ export default function HelpdeskPage() {
             ),
             ticket.parent,
             editingTicket === ticket.id ? (
-              <select value={editFormData.priority} onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white">
-                {TICKET_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+              <select 
+                value={editFormData.priority} 
+                onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value })} 
+                className="rounded border border-white/20 bg-gray-900 px-2 py-1 text-sm text-white focus:border-[#d9a441] focus:outline-none"
+              >
+                {TICKET_PRIORITIES.map(p => <option key={p} value={p} className="bg-gray-900 text-white">{p}</option>)}
               </select>
             ) : (
               <Badge key={`${ticket.id}-priority`} tone={ticket.priority === "Urgent" ? "danger" : ticket.priority === "High" ? "warn" : "neutral"}>
@@ -117,8 +123,12 @@ export default function HelpdeskPage() {
             ticket.assignee,
             ticket.sla,
             editingTicket === ticket.id ? (
-              <select value={editFormData.status} onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white">
-                {TICKET_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              <select 
+                value={editFormData.status} 
+                onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })} 
+                className="rounded border border-white/20 bg-gray-900 px-2 py-1 text-sm text-white focus:border-[#d9a441] focus:outline-none"
+              >
+                {TICKET_STATUSES.map(s => <option key={s} value={s} className="bg-gray-900 text-white">{s}</option>)}
               </select>
             ) : (
               <Badge key={`${ticket.id}-status`} tone={ticket.status === "Resolved" ? "good" : "warn"}>
