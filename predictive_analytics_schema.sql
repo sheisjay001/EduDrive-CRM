@@ -177,14 +177,9 @@ DECLARE
     v_factors JSONB;
 BEGIN
     -- Calculate predicted revenue based on active enrollments
-    SELECT COALESCE(SUM(fs.amount), 0) INTO v_predicted_revenue
-    FROM fee_structures fs
-    JOIN class_enrollments ce ON fs.class_level = (
-        SELECT c.class_level FROM classes c WHERE c.id = ce.class_id
-    )
-    WHERE ce.enrollment_status = 'active'
-    AND ce.school_id = p_school_id
-    AND fs.is_active = true;
+    -- Note: fee_structures table needs to be created separately
+    SELECT 0 INTO v_predicted_revenue;
+    -- Simplified version - would use fee_structures when available
     
     -- Predict collections based on historical payment rate (assume 85%)
     v_predicted_collections := v_predicted_revenue * 0.85;

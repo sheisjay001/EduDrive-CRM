@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS reminder_queue (
     retry_count INTEGER DEFAULT 0,
     max_retries INTEGER DEFAULT 3,
     next_retry_at TIMESTAMP WITH TIME ZONE,
-    processed_by UUID REFERENCES auth.users(id),
+    processed_by UUID REFERENCES users(id),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS reminder_processing_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     batch_id UUID,
     processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    processed_by UUID REFERENCES auth.users(id),
+    processed_by UUID REFERENCES users(id),
     processed_by_name VARCHAR(255),
     total_queued INTEGER DEFAULT 0,
     total_processed INTEGER DEFAULT 0,

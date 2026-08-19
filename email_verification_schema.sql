@@ -7,7 +7,7 @@ DROP TABLE IF EXISTS email_verifications CASCADE;
 -- Email verifications table
 CREATE TABLE IF NOT EXISTS email_verifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     email VARCHAR(255) NOT NULL,
     verification_token VARCHAR(255) UNIQUE NOT NULL,
     verification_code VARCHAR(10), -- 6-digit code for alternative verification

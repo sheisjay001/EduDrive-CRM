@@ -1,9 +1,6 @@
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 -- Schools table
 CREATE TABLE schools (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(150) NOT NULL UNIQUE,
     slug VARCHAR(100) NOT NULL UNIQUE,
     school_type VARCHAR(50) DEFAULT 'Secondary',
@@ -14,7 +11,7 @@ CREATE TABLE schools (
 
 -- Roles table with permissions
 CREATE TABLE roles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     name VARCHAR(80) NOT NULL,
     permissions JSONB DEFAULT '[]'::jsonb,
@@ -23,7 +20,7 @@ CREATE TABLE roles (
 
 -- Users table
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     role_id UUID REFERENCES roles(id) ON DELETE SET NULL,
     full_name VARCHAR(150) NOT NULL,
@@ -36,7 +33,7 @@ CREATE TABLE users (
 
 -- Families table
 CREATE TABLE families (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     household_name VARCHAR(150) NOT NULL,
     billing_contact_parent_id UUID,
@@ -47,7 +44,7 @@ CREATE TABLE families (
 
 -- Parents table
 CREATE TABLE parents (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     family_id UUID REFERENCES families(id) ON DELETE CASCADE,
     full_name VARCHAR(150) NOT NULL,
@@ -61,7 +58,7 @@ CREATE TABLE parents (
 
 -- Classes table
 CREATE TABLE classes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     name VARCHAR(50) NOT NULL,
     arm VARCHAR(10),
@@ -72,7 +69,7 @@ CREATE TABLE classes (
 
 -- Students table
 CREATE TABLE students (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     family_id UUID REFERENCES families(id) ON DELETE CASCADE,
     class_id UUID REFERENCES classes(id) ON DELETE SET NULL,
@@ -88,7 +85,7 @@ CREATE TABLE students (
 
 -- Leads table
 CREATE TABLE leads (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
@@ -106,7 +103,7 @@ CREATE TABLE leads (
 
 -- Invoices table
 CREATE TABLE invoices (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     student_id UUID REFERENCES students(id) ON DELETE CASCADE,
     invoice_number VARCHAR(50) UNIQUE,
@@ -121,7 +118,7 @@ CREATE TABLE invoices (
 
 -- Payments table
 CREATE TABLE payments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
     amount DECIMAL(10,2) NOT NULL,
@@ -133,7 +130,7 @@ CREATE TABLE payments (
 
 -- Tickets table
 CREATE TABLE tickets (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     family_id UUID REFERENCES families(id) ON DELETE CASCADE,
     parent_id UUID REFERENCES parents(id) ON DELETE CASCADE,
@@ -148,7 +145,7 @@ CREATE TABLE tickets (
 
 -- Message logs table
 CREATE TABLE message_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     channel VARCHAR(30) NOT NULL,
     recipient VARCHAR(150) NOT NULL,
@@ -161,7 +158,7 @@ CREATE TABLE message_logs (
 
 -- Activity logs table
 CREATE TABLE activity_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     user_id UUID,
     entity_type VARCHAR(80) NOT NULL,

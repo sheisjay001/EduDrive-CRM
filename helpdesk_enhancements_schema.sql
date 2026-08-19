@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS ticket_routing (
     category VARCHAR(100),
     priority VARCHAR(20), -- 'low', 'medium', 'high', 'urgent'
     assigned_role VARCHAR(50), -- 'admin', 'staff', 'teacher', etc.
-    assigned_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    assigned_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     auto_assign BOOLEAN DEFAULT false,
     assignment_criteria JSONB, -- Rules for auto-assignment
     is_active BOOLEAN DEFAULT true,
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS ticket_workflow (
     ticket_id UUID REFERENCES tickets(id) ON DELETE CASCADE,
     from_status VARCHAR(50),
     to_status VARCHAR(50) NOT NULL,
-    transitioned_by UUID REFERENCES auth.users(id),
+    transitioned_by UUID REFERENCES users(id),
     transitioned_by_name VARCHAR(255),
     transitioned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     notes TEXT,

@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS lost_lead_reasons (
     feedback_rating INTEGER, -- 1-5 scale for feedback quality
     follow_up_potential BOOLEAN DEFAULT false,
     follow_up_date DATE,
-    recorded_by UUID REFERENCES auth.users(id),
+    recorded_by UUID REFERENCES users(id),
     recorded_by_name VARCHAR(255),
     recorded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,

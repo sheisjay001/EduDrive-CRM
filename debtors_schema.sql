@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS debtor_aging (
     promise_amount DECIMAL(12,2),
     promise_kept BOOLEAN,
     collection_status VARCHAR(20) DEFAULT 'active', -- 'active', 'in_progress', 'escalated', 'written_off', 'resolved'
-    assigned_to UUID REFERENCES auth.users(id),
+    assigned_to UUID REFERENCES users(id),
     assigned_to_name VARCHAR(255),
     notes TEXT,
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS payment_reconciliation (
     payment_id UUID REFERENCES payments(id) ON DELETE CASCADE,
     invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL,
     reconciliation_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    reconciled_by UUID REFERENCES auth.users(id),
+    reconciled_by UUID REFERENCES users(id),
     reconciled_by_name VARCHAR(255),
     payment_amount DECIMAL(12,2),
     invoice_amount DECIMAL(12,2),

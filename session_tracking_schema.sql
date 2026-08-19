@@ -8,7 +8,7 @@ DROP TABLE IF EXISTS user_devices CASCADE;
 -- User devices table
 CREATE TABLE IF NOT EXISTS user_devices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     device_name VARCHAR(255),
     device_type VARCHAR(50), -- 'desktop', 'mobile', 'tablet'
     device_brand VARCHAR(100),
@@ -33,7 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_user_devices_school_id ON user_devices(school_id)
 -- User sessions table
 CREATE TABLE IF NOT EXISTS user_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     device_id UUID REFERENCES user_devices(id) ON DELETE SET NULL,
     session_token VARCHAR(255) UNIQUE NOT NULL,
     refresh_token VARCHAR(255) UNIQUE,
@@ -200,7 +200,7 @@ SELECT
     EXTRACT(EPOCH FROM (NOW() - us.login_at)) / 3600 as session_hours,
     ud.is_trusted
 FROM user_sessions us
-JOIN auth.users u ON us.user_id = u.id
+JOIN users u ON us.user_id = u.id
 JOIN user_devices ud ON us.device_id = ud.id
 WHERE us.is_active = true
 ORDER BY us.last_activity_at DESC;

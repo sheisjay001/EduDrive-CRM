@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS receipts (
     payment_method VARCHAR(50),
     payment_date TIMESTAMP WITH TIME ZONE,
     receipt_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    issued_by UUID REFERENCES auth.users(id),
+    issued_by UUID REFERENCES users(id),
     status VARCHAR(20) DEFAULT 'generated', -- 'generated', 'sent', 'delivered', 'failed'
     delivery_method VARCHAR(20), -- 'email', 'whatsapp', 'sms', 'download'
     delivery_attempts INTEGER DEFAULT 0,

@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS classes (
     section VARCHAR(50), -- 'A', 'B', 'C' for multiple sections
     capacity INTEGER DEFAULT 40,
     current_enrollment INTEGER DEFAULT 0,
-    class_teacher_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    class_teacher_id UUID REFERENCES users(id) ON DELETE SET NULL,
     class_teacher_name VARCHAR(255),
     academic_session_id UUID REFERENCES academic_sessions(id) ON DELETE SET NULL,
     is_active BOOLEAN DEFAULT true,
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS class_subjects (
     class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
     subject_name VARCHAR(100) NOT NULL,
     subject_code VARCHAR(50),
-    teacher_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    teacher_id UUID REFERENCES users(id) ON DELETE SET NULL,
     teacher_name VARCHAR(255),
     periods_per_week INTEGER DEFAULT 5,
     is_core_subject BOOLEAN DEFAULT false,

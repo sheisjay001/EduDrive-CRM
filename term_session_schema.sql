@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS academic_terms (
     end_date DATE NOT NULL,
     is_current BOOLEAN DEFAULT false,
     is_active BOOLEAN DEFAULT true,
-    fee_structure_id UUID REFERENCES fee_structures(id) ON DELETE SET NULL,
+    fee_structure_id UUID, -- Will reference fee_structures table when created
     description TEXT,
     school_id UUID REFERENCES schools(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
