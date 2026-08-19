@@ -6,14 +6,36 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
-import { Plus, User, Shield, Key, Activity } from "lucide-react";
+import { Plus, User, Shield, Key } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
+interface User {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+  status: string;
+}
+
+interface Permission {
+  id: string;
+  name: string;
+  description: string;
+  user_name?: string;
+  email?: string;
+  permissions?: string[];
+  user_id?: string;
+}
+
+interface RoleMatrix {
+  roles: Array<{ name: string; permissions: string[] }>;
+}
+
 export default function UserAdministrationPage() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [permissions, setPermissions] = useState<any[]>([]);
-  const [roleMatrix, setRoleMatrix] = useState<any>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [roleMatrix, setRoleMatrix] = useState<RoleMatrix | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"users" | "permissions" | "roles">("users");
   const [showCreateUserDialog, setShowCreateUserDialog] = useState(false);
@@ -198,7 +220,7 @@ export default function UserAdministrationPage() {
                         <Badge className={getRoleColor(user.role)}>
                           {user.role}
                         </Badge>
-                        <Badge variant="outline" className={user.status === 'active' ? "border-green-500/30 text-green-500" : "border-red-500/30 text-red-500"}>
+                        <Badge className={user.status === 'active' ? "border-green-500/30 text-green-500" : "border-red-500/30 text-red-500"}>
                           {user.status}
                         </Badge>
                         <div className="flex gap-2">
@@ -232,7 +254,7 @@ export default function UserAdministrationPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-3">
                           <p className="font-medium text-white">{perm.user_name}</p>
-                          <Badge variant="outline" className="border-white/20 text-white">
+                          <Badge className="border-white/20 text-white">
                             {perm.email}
                           </Badge>
                         </div>
@@ -247,7 +269,7 @@ export default function UserAdministrationPage() {
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          onClick={() => handleGrantPermission(perm.user_id, "custom_permission")}
+                          onClick={() => perm.user_id && handleGrantPermission(perm.user_id, "custom_permission")}
                           variant="outline"
                           className="border-green-500/30 text-green-500 hover:bg-green-500/10"
                         >
@@ -255,7 +277,7 @@ export default function UserAdministrationPage() {
                         </Button>
                         <Button
                           size="sm"
-                          onClick={() => handleRevokePermission(perm.user_id, "custom_permission")}
+                          onClick={() => perm.user_id && handleRevokePermission(perm.user_id, "custom_permission")}
                           variant="outline"
                           className="border-red-500/30 text-red-500 hover:bg-red-500/10"
                         >
@@ -285,7 +307,7 @@ export default function UserAdministrationPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {roleMatrix?.roles?.map((role: any) => (
+                    {roleMatrix?.roles?.map((role) => (
                       <tr key={role.name} className="border-b border-white/10">
                         <td className="px-4 py-3">
                           <Badge className={getRoleColor(role.name)}>
@@ -295,12 +317,12 @@ export default function UserAdministrationPage() {
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1">
                             {role.permissions?.slice(0, 3).map((perm: string) => (
-                              <Badge key={perm} variant="outline" className="border-white/20 text-white text-xs">
+                              <Badge key={perm} className="border-white/20 text-white text-xs">
                                 {perm}
                               </Badge>
                             ))}
                             {role.permissions?.length > 3 && (
-                              <Badge variant="outline" className="border-white/20 text-white text-xs">
+                              <Badge className="border-white/20 text-white text-xs">
                                 +{role.permissions.length - 3} more
                               </Badge>
                             )}

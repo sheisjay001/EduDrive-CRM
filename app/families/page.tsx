@@ -24,7 +24,7 @@ export default function FamiliesPage() {
   const canEdit = ["school_admin", "admissions_officer"].includes(userRole);
   const canDelete = userRole === "school_admin";
 
-  const handleEdit = (family: any) => {
+  const handleEdit = (family: { id: string; household_name?: string; householdName?: string; billing_contact_parent_id?: string; billingContactParentId?: string }) => {
     setEditingFamily(family.id);
     setEditFormData({
       household_name: family.household_name || family.householdName || "",
@@ -50,7 +50,7 @@ export default function FamiliesPage() {
       } else {
         alert("Failed to update family");
       }
-    } catch (error) {
+    } catch {
       alert("Error updating family");
     }
   };
@@ -77,7 +77,7 @@ export default function FamiliesPage() {
       } else {
         alert("Failed to delete family");
       }
-    } catch (error) {
+    } catch {
       alert("Error deleting family");
     }
   };
@@ -101,7 +101,7 @@ export default function FamiliesPage() {
       } else {
         alert("Failed to create family");
       }
-    } catch (error) {
+    } catch {
       alert("Error creating family");
     }
   };

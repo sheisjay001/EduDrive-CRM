@@ -46,7 +46,7 @@ export default function InvoiceDetailPage() {
             <div>
               <p className="text-sm text-[#9eb1cf]">Billing items</p>
               <div className="mt-4 space-y-3">
-                {data.lineItems.map((item) => (
+                {data.lineItems.map((item: any) => (
                   <div key={item.code} className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-sm text-[#d6dfef]">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-semibold text-white">{item.description}</p>
@@ -65,7 +65,7 @@ export default function InvoiceDetailPage() {
               <p className="text-sm leading-7 text-[#9eb1cf]">No payments have been received for this invoice.</p>
             ) : (
               <div className="space-y-3">
-                {data.payments.map((payment) => (
+                {data.payments.map((payment: any) => (
                   <div key={payment.paidAt} className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-sm text-[#d6dfef]">
                     <p className="font-semibold text-white">{payment.method}</p>
                     <p className="mt-2 text-sm text-[#9eb1cf]">Amount: {payment.amount}</p>

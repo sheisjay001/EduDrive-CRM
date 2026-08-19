@@ -5,14 +5,33 @@ import { AppShell } from "@/components/shell/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
-import { Plus, MapPin, User, Bus } from "lucide-react";
+import { LoadingPanel } from "@/components/dashboard/ops-primitives";
+import { MapPin, User, Bus, Plus } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
+interface BusRoute {
+  id: string;
+  route_name: string;
+  route_code: string;
+  name?: string;
+  status?: string;
+  capacity: number;
+  stop_count?: number;
+  driver_name?: string;
+  vehicle_number?: string;
+  stops?: Array<{ id: string; name: string }>;
+}
+
+interface BusStop {
+  id: string;
+  stop_name: string;
+  location: string;
+  route_id: string;
+}
+
 export default function BusRoutesPage() {
-  const [routes, setRoutes] = useState<any[]>([]);
-  const [stops, setStops] = useState<any[]>([]);
+  const [routes, setRoutes] = useState<BusRoute[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateRouteDialog, setShowCreateRouteDialog] = useState(false);
   const [showCreateStopDialog, setShowCreateStopDialog] = useState(false);
@@ -98,7 +117,7 @@ export default function BusRoutesPage() {
               </Button>
               <Button variant="secondary">
                 <MapPin className="mr-2 h-4 w-4" />
-                Stops ({stops.length})
+                Stops ({routes.reduce((acc, route) => acc + (route.stops?.length || 0), 0)})
               </Button>
             </div>
             <div className="flex gap-2">
@@ -125,7 +144,7 @@ export default function BusRoutesPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
                         <h3 className="text-lg font-semibold text-white">{route.name}</h3>
-                        <Badge variant="outline" className="border-[#d9a441]/30 text-[#d9a441]">
+                        <Badge className="border-[#d9a441]/30 text-[#d9a441]">
                           {route.status || 'active'}
                         </Badge>
                       </div>
@@ -146,11 +165,11 @@ export default function BusRoutesPage() {
                       <div className="mt-4">
                         <p className="text-xs uppercase tracking-[0.25em] text-[#8ea4c8]">Route Stops</p>
                         <div className="mt-2 flex flex-wrap gap-2">
-                          {route.stops?.map((stop: any) => (
-                            <Badge key={stop.id} variant="outline" className="border-white/20 text-white">
+                          {route.stops?.map((stop) => (
+                            <Badge key={stop.id} className="border-white/20 text-white">
                               {stop.name}
                             </Badge>
-                          )) || <span className="text-sm text-[#9eb1cf]">No stops added</span>}
+                          )) || <span className="text-sm text-[#9eb1cf]">No stops configured</span>}
                         </div>
                       </div>
                     </div>
@@ -158,7 +177,7 @@ export default function BusRoutesPage() {
                       <Button size="sm" variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10">
                         Edit
                       </Button>
-                      <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-五百/10">
+                      <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10">
                         Delete
                       </Button>
                     </div>

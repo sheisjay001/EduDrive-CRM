@@ -6,14 +6,44 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
-import { TrendingDown, Building2, DollarSign, AlertTriangle } from "lucide-react";
+import { Building2, DollarSign, AlertTriangle, TrendingDown } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
+interface AnalyticsData {
+  total_lost: number;
+  conversion_rate: number;
+  top_reason: string;
+  price_related: number;
+  competitor_wins?: number;
+  recoverable?: number;
+  reasons?: Array<{ category: string; description: string; count: number; percentage?: number }>;
+}
+
+interface CompetitorData {
+  id: string;
+  name: string;
+  competitor: string;
+  lost_leads: number;
+  leads_lost?: number;
+  location?: string;
+  avg_fee?: string;
+  strength?: string;
+  avg_price_sensitivity: number;
+}
+
+interface TrendsData {
+  month: string;
+  total_lost: number;
+  price_related: number;
+  competition_related: number;
+  monthly_trends?: Array<{ month: string; leads_lost: number; change: number; increase?: boolean; percentage_change?: number }>;
+}
+
 export default function LostLeadsPage() {
-  const [analyticsData, setAnalyticsData] = useState<any>(null);
-  const [competitorData, setCompetitorData] = useState<any[]>([]);
-  const [trendsData, setTrendsData] = useState<any>(null);
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [competitorData, setCompetitorData] = useState<CompetitorData[]>([]);
+  const [trendsData, setTrendsData] = useState<TrendsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "competitors" | "trends">("overview");
 
@@ -177,7 +207,7 @@ export default function LostLeadsPage() {
                   description="Primary reasons for losing prospects" 
                 />
                 <div className="mt-4 space-y-4">
-                  {analyticsData?.reasons?.map((reason: any) => (
+                  {analyticsData?.reasons?.map((reason) => (
                     <div key={reason.category} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Badge className={getReasonColor(reason.category)}>
@@ -211,7 +241,7 @@ export default function LostLeadsPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-3">
                           <h3 className="font-semibold text-white">{competitor.name}</h3>
-                          <Badge variant="outline" className="border-[#d9a441]/30 text-[#d9a441]">
+                          <Badge className="border-[#d9a441]/30 text-[#d9a441]">
                             {competitor.leads_lost} lost leads
                           </Badge>
                         </div>
@@ -235,7 +265,7 @@ export default function LostLeadsPage() {
                 description="Historical patterns and seasonal variations" 
               />
               <div className="mt-4 space-y-4">
-                {trendsData?.monthly_trends?.map((trend: any) => (
+                {trendsData?.monthly_trends?.map((trend) => (
                   <div key={trend.month} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-4">
                     <div>
                       <p className="font-medium text-white">{trend.month}</p>

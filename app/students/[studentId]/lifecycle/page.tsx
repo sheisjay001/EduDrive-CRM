@@ -1,31 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { AppShell } from "@/components/shell/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
-import { Plus, BookOpen, AlertTriangle, Heartbeat, Calendar } from "lucide-react";
+import { BookOpen, AlertTriangle, Activity, Calendar } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
+interface LifecycleLog {
+  id: string;
+  log_type: string;
+  description: string;
+  created_at: string;
+  term?: string;
+  title?: string;
+  resolved_at?: string;
+}
+
 export default function StudentLifecyclePage() {
   const { studentId } = useParams();
-  const [lifecycleLogs, setLifecycleLogs] = useState<any[]>([]);
+  const [lifecycleLogs, setLifecycleLogs] = useState<LifecycleLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"all" | "academic" | "disciplinary" | "medical" | "attendance">("all");
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  const fetchLifecycleLogs = async () => {
+  const fetchLifecycleLogs = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/lifecycle/logs/student/${studentId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("access_token")}`,
         },
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setLifecycleLogs(Array.isArray(data) ? data : data.logs || []);
@@ -35,17 +44,19 @@ export default function StudentLifecyclePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [studentId]);
 
-  useState(() => {
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
     fetchLifecycleLogs();
-  });
+  }, [fetchLifecycleLogs]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const getLogTypeIcon = (type: string) => {
-    const icons: Record<string, any> = {
+    const icons: Record<string, typeof BookOpen> = {
       academic: BookOpen,
       disciplinary: AlertTriangle,
-      medical: Heartbeat,
+      medical: Activity,
       attendance: Calendar,
     };
     return icons[type] || BookOpen;
@@ -101,7 +112,7 @@ export default function StudentLifecyclePage() {
                 variant={activeTab === "medical" ? "primary" : "secondary"}
                 onClick={() => setActiveTab("medical")}
               >
-                <Heartbeat className="mr-2 h-4 w-4" />
+                <Activity className="mr-2 h-4 w-4" />
                 Medical
               </Button>
               <Button
@@ -112,10 +123,6 @@ export default function StudentLifecyclePage() {
                 Attendance
               </Button>
             </div>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Record
-            </Button>
           </div>
 
           <Card className="p-6">
@@ -147,7 +154,7 @@ export default function StudentLifecyclePage() {
                             {new Date(log.created_at).toLocaleString()}
                           </span>
                           {log.term && (
-                            <Badge variant="outline" className="border-[#d9a441]/30 text-[#d9a441]">
+                            <Badge className="border-[#d9a441]/30 text-[#d9a441]">
                               {log.term}
                             </Badge>
                           )}

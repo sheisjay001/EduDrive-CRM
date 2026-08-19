@@ -10,8 +10,21 @@ import { getUser } from "@/services/auth-storage";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
+interface Activity {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  user_id: string;
+  user_name?: string;
+  timestamp: string;
+  created_at?: string;
+  description?: string;
+  details?: Record<string, unknown>;
+}
+
 export default function ActivityPage() {
-  const [activities, setActivities] = useState<any[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "user" | "entity">("all");
   const user = getUser();
@@ -111,7 +124,7 @@ export default function ActivityPage() {
                           {activity.entity_type}
                         </Badge>
                         <span className="text-sm text-[#9eb1cf]">
-                          {new Date(activity.created_at).toLocaleString()}
+                          {activity.created_at ? new Date(activity.created_at).toLocaleString() : new Date(activity.timestamp).toLocaleString()}
                         </span>
                       </div>
                       <p className="mt-2 font-medium text-white">{activity.action}</p>

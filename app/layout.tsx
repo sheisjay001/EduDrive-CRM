@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Manrope } from "next/font/google";
 import { AppProviders } from "@/components/shell/app-providers";
 import "./globals.css";
 
-const display = Cormorant_Garamond({
-  variable: "--font-display",
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-});
+// Temporarily disabled Google Fonts due to network issues
+// import { Cormorant_Garamond, Manrope } from "next/font/google";
 
-const body = Manrope({
-  variable: "--font-body",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
+// const display = Cormorant_Garamond({
+//   variable: "--font-display",
+//   subsets: ["latin"],
+//   weight: ["500", "600", "700"],
+// });
+
+// const body = Manrope({
+//   variable: "--font-body",
+//   subsets: ["latin"],
+//   weight: ["400", "500", "600", "700"],
+// });
 
 export const metadata: Metadata = {
   title: "EduDrive CRM",
@@ -26,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable} h-full antialiased`}>
+    <html lang="en" className="h-full antialiased">
       <body className="min-h-full bg-[#0b1225] font-sans text-[#f6f1e8]" suppressHydrationWarning>
         <AppProviders>{children}</AppProviders>
       </body>

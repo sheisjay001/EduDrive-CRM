@@ -29,7 +29,7 @@ export function useNotifications() {
           if (randomNotification) {
             const newNotification: Notification = {
               id: Math.random().toString(36).substr(2, 9),
-              type: ["success", "error", "warning", "info"][Math.floor(Math.random() * 4)] as any,
+              type: (["success", "error", "warning", "info"] as const)[Math.floor(Math.random() * 4)],
               title: "System Notification",
               message: `This is a simulated notification at ${new Date().toLocaleTimeString()}`,
               timestamp: new Date(),

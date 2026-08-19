@@ -5,14 +5,35 @@ import { AppShell } from "@/components/shell/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
-import { Plus, Users, BookOpen, GraduationCap } from "lucide-react";
+import { LoadingPanel } from "@/components/dashboard/ops-primitives";
+import { Users, BookOpen, GraduationCap, Plus } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
+interface Class {
+  id: string;
+  class_name: string;
+  class_code: string;
+  class_level: string;
+  name?: string;
+  level?: string;
+  section?: string;
+  capacity: number;
+  current_enrollment: number;
+  student_count?: number;
+  subject_count?: number;
+  subjects?: Array<{ id: string; name: string; teacher_name: string }>;
+}
+
+interface Subject {
+  id: string;
+  subject_name: string;
+  subject_code: string;
+  teacher_name: string;
+}
+
 export default function ClassesPage() {
-  const [classes, setClasses] = useState<any[]>([]);
-  const [subjects, setSubjects] = useState<any[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateClassDialog, setShowCreateClassDialog] = useState(false);
   const [showCreateSubjectDialog, setShowCreateSubjectDialog] = useState(false);
@@ -117,7 +138,7 @@ export default function ClassesPage() {
               </Button>
               <Button variant="secondary">
                 <BookOpen className="mr-2 h-4 w-4" />
-                Subjects ({subjects.length})
+                Subjects ({classes.reduce((acc, classItem) => acc + (classItem.subjects?.length || 0), 0)})
               </Button>
             </div>
             <div className="flex gap-2">
@@ -144,10 +165,10 @@ export default function ClassesPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
                         <h3 className="text-lg font-semibold text-white">{classItem.name}</h3>
-                        <Badge variant="outline" className="border-[#d9a441]/30 text-[#d9a441]">
+                        <Badge className="border-[#d9a441]/30 text-[#d9a441]">
                           {classItem.level}
                         </Badge>
-                        <Badge variant="outline" className="border-white/20 text-white">
+                        <Badge className="border-white/20 text-white">
                           {classItem.section}
                         </Badge>
                       </div>
@@ -167,8 +188,8 @@ export default function ClassesPage() {
                       <div className="mt-4">
                         <p className="text-xs uppercase tracking-[0.25em] text-[#8ea4c8]">Assigned Subjects</p>
                         <div className="mt-2 flex flex-wrap gap-2">
-                          {classItem.subjects?.map((subject: any) => (
-                            <Badge key={subject.id} variant="outline" className="border-white/20 text-white">
+                          {classItem.subjects?.map((subject) => (
+                            <Badge key={subject.id} className="border-white/20 text-white">
                               {subject.name} - {subject.teacher_name}
                             </Badge>
                           )) || <span className="text-sm text-[#9eb1cf]">No subjects assigned</span>}

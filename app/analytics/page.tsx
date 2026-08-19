@@ -1,36 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppShell } from "@/components/shell/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingPanel, SectionTitle, TrendPanel, KpiGrid } from "@/components/dashboard/ops-primitives";
-import { TrendingUp, TrendingDown, Users, DollarSign, GraduationCap, AlertCircle } from "lucide-react";
+import { TrendingUp, Users, DollarSign, GraduationCap, AlertCircle } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
+interface AnalyticsData {
+  total_students: number;
+  active_students: number;
+  total_revenue: number;
+  retention_rate: number;
+  predicted_enrollment?: string;
+  fee_forecast?: string;
+  at_risk_count?: string;
+  next_term_prediction?: string;
+  model_accuracy?: string;
+  confidence_level?: string;
+  projected_revenue?: string;
+  collection_rate?: string;
+  risk_factors?: Array<{ factor: string; impact: string }>;
+  at_risk_students?: Array<{ id: string; name: string; risk_level: string; class?: string; risk_score?: string }>;
+  historical_trends?: Array<{ name: string; value: number }>;
+  enrollment_trends?: Array<{ month: string; count: number }>;
+  revenue_trends?: Array<{ month: string; amount: number }>;
+}
+
 export default function AnalyticsPage() {
-  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "enrollment" | "finance" | "retention">("overview");
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
-      const endpoint = activeTab === "overview" 
-        ? "/analytics/dashboard" 
-        : activeTab === "enrollment" 
-        ? "/analytics/enrollment/forecast" 
-        : activeTab === "finance" 
-        ? "/analytics/fee/forecast" 
+      const endpoint = activeTab === "overview"
+        ? "/analytics/dashboard"
+        : activeTab === "enrollment"
+        ? "/analytics/enrollment/forecast"
+        : activeTab === "finance"
+        ? "/analytics/fee/forecast"
         : "/analytics/retention/risk";
-      
+
       const response = await fetch(`${API_URL}${endpoint}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("access_token")}`,
         },
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setAnalyticsData(data);
@@ -40,16 +60,18 @@ export default function AnalyticsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeTab]);
 
-  useState(() => {
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
     fetchAnalytics();
-  });
+  }, [fetchAnalytics]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const kpiData = [
     { label: "Predicted Enrollment", value: analyticsData?.predicted_enrollment || "N/A", change: "+12% vs last term", tone: "good" as const },
     { label: "Fee Collection Forecast", value: analyticsData?.fee_forecast || "N/A", change: "+8% vs target", tone: "good" as const },
-    { label: "Retention Rate", value: analyticsData?.retention_rate || "N/A", change: "-2% vs last term", tone: "warn" as const },
+    { label: "Retention Rate", value: String(analyticsData?.retention_rate || "N/A"), change: "-2% vs last term", tone: "warn" as const },
     { label: "At-Risk Students", value: analyticsData?.at_risk_count || "N/A", change: "Requires attention", tone: "warn" as const },
   ];
 
@@ -146,7 +168,7 @@ export default function AnalyticsPage() {
                   <span className="text-sm text-[#9eb1cf]">Risk Factors</span>
                   <Badge className="bg-yellow-500/20 text-yellow-400">
                     <AlertCircle className="mr-1 h-3 w-3" />
-                    {analyticsData?.risk_factors || "3 identified"}
+                    {analyticsData?.risk_factors?.length || 3} identified
                   </Badge>
                 </div>
               </div>
@@ -159,8 +181,8 @@ export default function AnalyticsPage() {
               description="Students at risk of leaving with intervention recommendations" 
             />
             <div className="mt-4 space-y-4">
-              {analyticsData?.at_risk_students?.length > 0 ? (
-                analyticsData.at_risk_students.map((student: any) => (
+              {analyticsData?.at_risk_students && analyticsData.at_risk_students.length > 0 ? (
+                analyticsData.at_risk_students.map((student) => (
                   <div key={student.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-4">
                     <div>
                       <p className="font-medium text-white">{student.name}</p>
@@ -178,7 +200,6 @@ export default function AnalyticsPage() {
           </Card>
 
           <TrendPanel
-            className="mt-6"
             title="Historical Trends"
             description="Performance trends over the past academic year"
             data={analyticsData?.historical_trends || []}

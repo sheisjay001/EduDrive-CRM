@@ -70,7 +70,7 @@ export default function SettingsPage() {
       } else {
         alert("Failed to save settings");
       }
-    } catch (error) {
+    } catch {
       alert("Error saving settings");
     } finally {
       setIsSaving(false);

@@ -70,10 +70,10 @@ export function useFileUpload(options: FileUploadOptions = {}) {
         url: data.url || URL.createObjectURL(file),
         uploadedAt: new Date(),
       };
-    } catch (error) {
+    } catch {
       throw new Error("Failed to upload file");
     }
-  }, []);
+  }, [validateFile]);
 
   const handleFileSelect = useCallback(async (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
@@ -116,7 +116,7 @@ export function useFileUpload(options: FileUploadOptions = {}) {
       }
 
       setFiles(prev => [...prev, ...uploadedFiles]);
-    } catch (error) {
+    } catch {
       setError("Failed to upload one or more files");
     } finally {
       setIsUploading(false);

@@ -39,7 +39,7 @@ export default function HelpdeskDashboardPage() {
                   { id: "TKT-003", parent: "Mrs. Okafor", subject: "Grade inquiry", priority: "Low", status: "Open", age: "1 day" },
                   { id: "TKT-004", parent: "Mr. Yusuf", subject: "Facility complaint", priority: "High", status: "Escalated", age: "3 hours" },
                   { id: "TKT-005", parent: "Mrs. Adebayo", subject: "Schedule change request", priority: "Medium", status: "Open", age: "6 hours" },
-                ].map((ticket, idx) => (
+                ].map((ticket) => (
                   <div key={ticket.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-4">
                     <div>
                       <div className="flex items-center gap-2">
@@ -67,7 +67,7 @@ export default function HelpdeskDashboardPage() {
                   { category: "Facilities", count: 2, percentage: "17%" },
                   { category: "Transportation", count: 1, percentage: "8%" },
                   { category: "Other", count: 1, percentage: "8%" },
-                ].map((cat, idx) => (
+                ].map((cat) => (
                   <div key={cat.category} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-4">
                     <div>
                       <p className="font-semibold text-white">{cat.category}</p>

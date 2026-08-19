@@ -29,7 +29,7 @@ export default function StaffPage() {
     setEditFormData({ full_name: staff.name, email: staff.email, role: staff.role, phone: staff.phone });
   };
 
-  const handleSaveEdit = async (_staffId: string) => {
+  const handleSaveEdit = async () => {
     try {
       // TODO: Implement proper API call when backend has staff update endpoint
       // const response = await fetch(`${API_URL}/staff/${staffId}`, {
@@ -45,7 +45,7 @@ export default function StaffPage() {
 
   const handleCancelEdit = () => { setEditingStaff(null); setEditFormData({}); };
 
-  const handleDelete = async (_staffId: string) => {
+  const handleDelete = async () => {
     if (!confirm("Delete this staff member?")) return;
     try {
       // TODO: Implement proper API call when backend has staff delete endpoint
@@ -128,13 +128,13 @@ export default function StaffPage() {
               <div key={`person-${index}-actions`} className="flex gap-2">
                 {editingStaff === index ? (
                   <>
-                    <Button size="sm" onClick={() => handleSaveEdit(index.toString())} className="bg-green-600 text-white hover:bg-green-700"><Save className="h-4 w-4" /></Button>
+                    <Button size="sm" onClick={() => handleSaveEdit()} className="bg-green-600 text-white hover:bg-green-700"><Save className="h-4 w-4" /></Button>
                     <Button size="sm" onClick={handleCancelEdit} variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10"><X className="h-4 w-4" /></Button>
                   </>
                 ) : (
                   <>
                     {canEdit && <Button size="sm" onClick={() => handleEdit(person, index)} variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10"><Edit className="h-4 w-4" /></Button>}
-                    {canDelete && <Button size="sm" onClick={() => handleDelete(index.toString())} variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10"><Trash2 className="h-4 w-4" /></Button>}
+                    {canDelete && <Button size="sm" onClick={() => handleDelete()} variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10"><Trash2 className="h-4 w-4" /></Button>}
                   </>
                 )}
               </div>,

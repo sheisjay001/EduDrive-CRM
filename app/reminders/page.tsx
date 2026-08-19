@@ -6,12 +6,24 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
-import { Plus, Clock, Check, X } from "lucide-react";
+import { Clock, Check, X, Plus } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
+interface Reminder {
+  id: string;
+  recipient: string;
+  message: string;
+  scheduled_for: string;
+  status: string;
+  reminder_type?: string;
+  subject?: string;
+  recipient_email?: string;
+  recipient_phone?: string;
+}
+
 export default function RemindersPage() {
-  const [reminders, setReminders] = useState<any[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
@@ -139,8 +151,8 @@ export default function RemindersPage() {
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
-                        <Badge className={getReminderTypeColor(reminder.reminder_type)}>
-                          {reminder.reminder_type}
+                        <Badge className={getReminderTypeColor(reminder.reminder_type || "general")}>
+                          {reminder.reminder_type || "General"}
                         </Badge>
                         <Badge className={getStatusColor(reminder.status)}>
                           {reminder.status}

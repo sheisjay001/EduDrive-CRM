@@ -10,10 +10,39 @@ import { User, TrendingUp, AlertCircle, CheckCircle } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
+interface WorkloadData {
+  total_staff: number;
+  average_workload: number;
+  overloaded_staff: number;
+  underutilized_staff: number;
+  optimal_count?: number;
+  high_count?: number;
+  overloaded_count?: number;
+  staff_workload?: Array<{ id: string; name: string; workload: number; priority: string; role?: string; workload_percentage?: number; task_count?: number }>;
+}
+
+interface RoleSummary {
+  role: string;
+  count: number;
+  average_workload: number;
+  staff_count?: number;
+  avg_workload?: number;
+  total_tasks?: number;
+  productivity_score?: number;
+  priority_level?: string;
+}
+
+interface PerformanceTrends {
+  labels: string[];
+  workload: number[];
+  efficiency: number[];
+  monthly_trends?: Array<{ month: string; avg_workload: number; efficiency: number; productivity?: number; improvement?: number; change?: number }>;
+}
+
 export default function WorkloadPage() {
-  const [workloadData, setWorkloadData] = useState<any>(null);
-  const [roleSummary, setRoleSummary] = useState<any[]>([]);
-  const [performanceTrends, setPerformanceTrends] = useState<any>(null);
+  const [workloadData, setWorkloadData] = useState<WorkloadData | null>(null);
+  const [roleSummary, setRoleSummary] = useState<RoleSummary[]>([]);
+  const [performanceTrends, setPerformanceTrends] = useState<PerformanceTrends | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"current" | "by-role" | "trends">("current");
 
@@ -87,7 +116,7 @@ export default function WorkloadPage() {
   };
 
   const getPriorityIcon = (priority: string) => {
-    const icons: Record<string, any> = {
+    const icons: Record<string, typeof CheckCircle> = {
       low: CheckCircle,
       normal: CheckCircle,
       high: AlertCircle,
@@ -188,7 +217,7 @@ export default function WorkloadPage() {
                   description="Current workload status by staff member" 
                 />
                 <div className="mt-4 space-y-4">
-                  {workloadData?.staff_workload?.map((staff: any) => {
+                  {workloadData?.staff_workload?.map((staff) => {
                     const PriorityIcon = getPriorityIcon(staff.priority);
                     return (
                       <div key={staff.id} className="flex items-start justify-between rounded-xl border border-white/10 bg-white/5 p-4">
@@ -234,7 +263,7 @@ export default function WorkloadPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-3">
                           <h3 className="font-semibold text-white">{role.role}</h3>
-                          <Badge variant="outline" className="border-[#d9a441]/30 text-[#d9a441]">
+                          <Badge className="border-[#d9a441]/30 text-[#d9a441]">
                             {role.staff_count} staff
                           </Badge>
                         </div>
@@ -253,8 +282,8 @@ export default function WorkloadPage() {
                           </div>
                         </div>
                       </div>
-                      <Badge className={getPriorityColor(role.priority_level)}>
-                        {role.priority_level}
+                      <Badge className={getPriorityColor(role.priority_level || "medium")}>
+                        {role.priority_level || "Medium"}
                       </Badge>
                     </div>
                   ))
@@ -270,7 +299,7 @@ export default function WorkloadPage() {
                 description="Workload and productivity trends over time" 
               />
               <div className="mt-4 space-y-4">
-                {performanceTrends?.monthly_trends?.map((trend: any) => (
+                {performanceTrends?.monthly_trends?.map((trend) => (
                   <div key={trend.month} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-4">
                     <div>
                       <p className="font-medium text-white">{trend.month}</p>

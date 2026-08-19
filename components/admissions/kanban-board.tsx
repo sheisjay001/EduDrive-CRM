@@ -3,9 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Plus, MoreVertical } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import type { LeadItem, StageCard } from "@/types/crm";
 
 const STAGES = [

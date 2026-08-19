@@ -4,9 +4,9 @@ type ExportFormat = "pdf" | "excel" | "csv";
 
 interface ReportData {
   title: string;
-  data: any[];
+  data: Record<string, unknown>[];
   columns: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export function useReportExport() {
@@ -68,7 +68,7 @@ export function useReportExport() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (error) {
+    } catch {
       // Fallback to CSV if API call fails
       exportToCSV(data);
     }
@@ -100,7 +100,7 @@ export function useReportExport() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (error) {
+    } catch {
       setError("PDF export requires server-side generation. Please try again later.");
     }
   };
@@ -160,7 +160,7 @@ export function useReportExport() {
       }
 
       return await response.json();
-    } catch (error) {
+    } catch {
       throw new Error("Failed to schedule report");
     }
   };

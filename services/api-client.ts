@@ -1,15 +1,3 @@
-import {
-  admissionsData,
-  dashboardData,
-  familiesData,
-  financeData,
-  helpdeskData,
-  messagingData,
-  reportsData,
-  settingsData,
-  staffData,
-  studentsData,
-} from "@/services/mock-data";
 import { clearAuthTokens, getAccessToken, getRefreshToken, saveAuthTokens, saveUser } from "@/services/auth-storage";
 import type {
   AdmissionsResponse,
@@ -20,12 +8,11 @@ import type {
   DashboardResponse,
   FeeStructuresResponse,
   ForgotPasswordPayload,
-  InvoiceDetail,
-  InvoiceItem,
   FamilyDetail,
   FamiliesResponse,
   FinanceResponse,
   HelpdeskResponse,
+  InvoiceDetail,
   LeadDetail,
   MessageTemplatesResponse,
   MessagingResponse,
@@ -39,7 +26,6 @@ import type {
   StudentDetail,
   StudentsResponse,
   TicketDetailResponse,
-  TicketItem,
 } from "@/types/crm";
 
 
