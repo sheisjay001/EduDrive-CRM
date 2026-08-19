@@ -1039,6 +1039,8 @@ def update_ticket(ticket_id: str, payload: dict, current_user: AuthUser = Depend
             update_data['status'] = payload['status']
         if payload.get('priority'):
             update_data['priority'] = payload['priority']
+        if payload.get('subject'):
+            update_data['subject'] = payload['subject']
         if payload.get('assignee_user_id'):
             update_data['assignee_user_id'] = payload['assignee_user_id']
         if payload.get('sla_due_at'):
@@ -1172,6 +1174,13 @@ def report_detail(report_name: str, current_user: AuthUser = Depends(get_current
         data=[],
         generatedAt=datetime.now().strftime("%Y-%m-%d")
     )
+
+
+@router.get("/settings/overview", response_model=SettingsResponse)
+def settings_overview(current_user: AuthUser = Depends(get_current_user)) -> SettingsResponse:
+    if not has_permission(current_user, "settings:view"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+    return demo_data.get_settings()
 
 
 @router.patch("/settings")

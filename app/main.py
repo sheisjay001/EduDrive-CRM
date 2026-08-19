@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
+from app.api.docs import custom_openapi
 from app.core.config import settings
 
 app = FastAPI(
@@ -10,6 +11,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Set custom OpenAPI schema
+app.openapi = custom_openapi
 
 app.add_middleware(
     CORSMiddleware,
