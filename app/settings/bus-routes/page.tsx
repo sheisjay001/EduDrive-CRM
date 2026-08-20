@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/shell/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,9 +55,9 @@ export default function BusRoutesPage() {
     }
   };
 
-  useState(() => {
+  useEffect(() => {
     fetchBusRoutes();
-  });
+  }, []);
 
   const handleCreateRoute = async (routeData: Record<string, unknown>) => {
     try {

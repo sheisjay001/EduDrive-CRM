@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/shell/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -99,11 +99,11 @@ export default function WorkloadPage() {
     }
   };
 
-  useState(() => {
+  useEffect(() => {
     if (activeTab === "current") fetchCurrentWorkload();
     else if (activeTab === "by-role") fetchRoleSummary();
     else if (activeTab === "trends") fetchPerformanceTrends();
-  });
+  }, [activeTab]);
 
   const getPriorityColor = (priority: string) => {
     const colors: Record<string, string> = {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/shell/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,9 +57,9 @@ export default function ClassesPage() {
     }
   };
 
-  useState(() => {
+  useEffect(() => {
     fetchClasses();
-  });
+  }, []);
 
   const handleCreateClass = async (classData: Record<string, unknown>) => {
     try {

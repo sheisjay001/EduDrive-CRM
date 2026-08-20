@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/shell/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -100,11 +100,11 @@ export default function LostLeadsPage() {
     }
   };
 
-  useState(() => {
+  useEffect(() => {
     if (activeTab === "overview") fetchLostLeadAnalytics();
     else if (activeTab === "competitors") fetchCompetitorAnalysis();
     else if (activeTab === "trends") fetchTrends();
-  });
+  }, [activeTab]);
 
   const getReasonColor = (reason: string) => {
     const colors: Record<string, string> = {

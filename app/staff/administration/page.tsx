@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/shell/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -97,11 +97,11 @@ export default function UserAdministrationPage() {
     }
   };
 
-  useState(() => {
+  useEffect(() => {
     if (activeTab === "users") fetchUsers();
     else if (activeTab === "permissions") fetchPermissions();
     else if (activeTab === "roles") fetchRoleMatrix();
-  });
+  }, [activeTab]);
 
   const handleGrantPermission = async (userId: string, permission: string) => {
     try {
