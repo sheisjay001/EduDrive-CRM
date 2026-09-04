@@ -40,7 +40,7 @@ export default function ParentLoginPage() {
       localStorage.setItem("user", JSON.stringify(data.user));
 
       // Redirect to parent portal
-      router.push("/parents");
+      router.push("/dashboard/parent");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Parent login failed");
     } finally {

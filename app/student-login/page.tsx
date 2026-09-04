@@ -45,7 +45,7 @@ export default function StudentLoginPage() {
       localStorage.setItem("user", JSON.stringify(data.user));
 
       // Redirect to student portal
-      router.push("/students");
+      router.push("/dashboard/student");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Student login failed");
     } finally {
