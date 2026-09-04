@@ -60,6 +60,16 @@ from app.api.messaging_routes import router as messaging_router
 from app.api.frontdesk_routes import router as frontdesk_router
 from app.api.school_routes import router as school_router
 from app.api.student_routes import router as student_router
+from app.api.analytics_routes import router as analytics_router
+from app.api.bulk_billing_routes import router as bulk_billing_router
+from app.api.class_routes import router as class_router
+from app.api.debtors_routes import router as debtors_router
+from app.api.lost_lead_routes import router as lost_lead_router
+from app.api.receipt_routes import router as receipt_router
+from app.api.term_routes import router as term_router
+from app.api.user_admin_routes import router as user_admin_router
+from app.api.workload_routes import router as workload_router
+from app.api.transport_routes import router as transport_router, compat_router as transport_compat_router
 
 router = APIRouter()
 router.include_router(activity_router)
@@ -71,6 +81,17 @@ router.include_router(messaging_router)
 router.include_router(frontdesk_router)
 router.include_router(school_router)
 router.include_router(student_router)
+router.include_router(analytics_router)
+router.include_router(bulk_billing_router)
+router.include_router(class_router)
+router.include_router(debtors_router)
+router.include_router(lost_lead_router)
+router.include_router(receipt_router)
+router.include_router(term_router)
+router.include_router(user_admin_router)
+router.include_router(workload_router)
+router.include_router(transport_router)
+router.include_router(transport_compat_router)
 
 
 @router.post("/auth/login", response_model=AuthResponse)
@@ -164,6 +185,29 @@ def signup(payload: dict) -> AuthResponse:
 @router.post("/auth/refresh", response_model=AuthResponse)
 def refresh_token(payload: AuthRefreshRequest) -> AuthResponse:
     user = decode_refresh_token(payload.refresh_token)
+    access_token, refresh_token = create_tokens_for_user(user)
+    return AuthResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        expires_in=3600,
+        user=user,
+    )
+
+
+@router.post("/auth/parent-login", response_model=AuthResponse)
+def parent_login(payload: AuthRequest) -> AuthResponse:
+    user = authenticate_user(payload.email, payload.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+        )
+    if user.role != "parent":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This login is for parents only",
+        )
     access_token, refresh_token = create_tokens_for_user(user)
     return AuthResponse(
         access_token=access_token,
@@ -4663,58 +4707,6 @@ def get_student_retention_analysis(current_user: AuthUser = Depends(get_current_
         return {"student_retention": {"by_year": {}, "overall_retention_rate": 0, "total_students": 0, "active_students": 0, "inactive_students": 0, "retention_trend": "unknown"}}
 
 
-@router.post("/auth/parent-login")
-def parent_login(payload: dict):
-    """Parent login endpoint"""
-    email = payload.get('email')
-    password = payload.get('password')
-    
-    if not email or not password:
-        raise HTTPException(status_code=400, detail="Email and password are required")
-    
-    supabase = get_supabase_client()
-    try:
-        # Authenticate with Supabase
-        auth_response = supabase.auth.sign_in_with_password({
-            "email": email,
-            "password": password
-        })
-        
-        # Check if user has parent role
-        user_id = auth_response.user.id
-        roles_result = supabase.table('user_roles').select('*').eq('user_id', user_id).execute()
-        roles = roles_result.data or []
-        
-        parent_role = None
-        for role in roles:
-            if role['role'] == 'parent':
-                parent_role = role
-                break
-        
-        if not parent_role:
-            raise HTTPException(status_code=403, detail="User does not have parent role")
-        
-        # Get parent's family information
-        family_result = supabase.table('families').select('*').eq('primary_contact_email', email).execute()
-        family = family_result.data[0] if family_result.data else None
-        
-        return {
-            "access_token": auth_response.session.access_token,
-            "refresh_token": auth_response.session.refresh_token,
-            "user": {
-                "id": auth_response.user.id,
-                "email": auth_response.user.email,
-                "role": "parent",
-                "family_id": family['id'] if family else None
-            }
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error during parent login: {e}")
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-
 @router.get("/parent/children")
 def get_parent_children(current_user: AuthUser = Depends(get_current_user)):
     """Get children for the logged-in parent"""
@@ -4722,32 +4714,59 @@ def get_parent_children(current_user: AuthUser = Depends(get_current_user)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     supabase = get_supabase_client()
     try:
-        # Get parent's family
-        family_result = supabase.table('families').select('*').eq('primary_contact_email', current_user.email).execute()
-        family = family_result.data[0] if family_result.data else None
-        
-        if not family:
-            return {"children": []}
-        
-        # Get students in the family
-        students_result = supabase.table('students').select('*, classes(*)').eq('family_id', family['id']).execute()
-        students = students_result.data or []
-        
+        family_ids = []
+        student_ids = []
+
+        try:
+            parents_by_email = supabase.table("parents").select("family_id").eq("email", current_user.email).execute()
+            for p in parents_by_email.data or []:
+                if p.get("family_id"):
+                    family_ids.append(p["family_id"])
+        except Exception:
+            pass
+
+        try:
+            families_by_email = supabase.table("families").select("id").ilike("billing_contact_email", current_user.email).execute()
+            for f in families_by_email.data or []:
+                family_ids.append(f["id"])
+        except Exception:
+            pass
+
+        if current_user.schoolId:
+            try:
+                school_scope = supabase.table("parents").select("family_id").eq("email", current_user.email).eq("school_id", current_user.schoolId).execute()
+                for p in school_scope.data or []:
+                    if p.get("family_id"):
+                        family_ids.append(p["family_id"])
+            except Exception:
+                pass
+
+        family_ids = list(dict.fromkeys(family_ids)) or ["__none__"]
+        try:
+            students_result = supabase.table("students").select("*, classes(*)").in_("family_id", family_ids).execute()
+            students = students_result.data or []
+        except Exception:
+            students = []
+
         children = []
-        for student in students:
+        for s in students:
+            classes = s.get("classes") or {}
+            class_name = classes.get("name") if isinstance(classes, dict) else (s.get("class_id") or "")
             children.append({
-                "id": student['id'],
-                "name": student.get('name', ''),
-                "email": student.get('email', ''),
-                "class": student.get('classes', {}).get('name', ''),
-                "status": student.get('status', ''),
-                "enrollment_date": student.get('enrollment_date', '')
+                "id": s["id"],
+                "student_id": s.get("admission_no") or s.get("id"),
+                "full_name": " ".join(filter(None, [s.get("first_name", ""), s.get("last_name", "")])) or s.get("name") or s.get("email", ""),
+                "class": class_name,
+                "grade": classes.get("level_group") if isinstance(classes, dict) else "",
+                "date_of_birth": s.get("date_of_birth", ""),
+                "admission_number": s.get("admission_no") or "",
             })
-        
-        return {"children": children}
+            student_ids.append(s["id"])
+
+        return {"children": children, "family_ids": family_ids, "student_ids": student_ids}
     except Exception as e:
         print(f"Error fetching parent children: {e}")
-        return {"children": []}
+        return {"children": [], "family_ids": [], "student_ids": []}
 
 
 @router.get("/parent/invoices")
@@ -4757,17 +4776,29 @@ def get_parent_invoices(current_user: AuthUser = Depends(get_current_user)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     supabase = get_supabase_client()
     try:
-        # Get parent's family
-        family_result = supabase.table('families').select('*').eq('primary_contact_email', current_user.email).execute()
-        family = family_result.data[0] if family_result.data else None
-        
-        if not family:
-            return {"invoices": []}
-        
-        # Get invoices for the family
-        invoices_result = supabase.table('invoices').select('*').eq('family_id', family['id']).order('created_at', desc=True).execute()
-        invoices = invoices_result.data or []
-        
+        children_resp = get_parent_children(current_user)
+        student_ids = children_resp.get("student_ids", []) or []
+        invoices = []
+
+        if student_ids:
+            try:
+                inv_res = supabase.table("invoices").select("*, students(*)").in_("student_id", student_ids).order("created_at", desc=True).execute()
+                for inv in inv_res.data or []:
+                    stu = inv.get("students") or {}
+                    stu_name = " ".join(filter(None, [stu.get("first_name"), stu.get("last_name")])) if isinstance(stu, dict) else ""
+                    invoices.append({
+                        "id": inv.get("id"),
+                        "invoice_number": inv.get("invoice_number"),
+                        "amount_due": float(inv.get("amount_due") or 0),
+                        "amount_paid": float(inv.get("amount_paid") or 0),
+                        "status": inv.get("status"),
+                        "due_date": inv.get("due_date"),
+                        "description": inv.get("term") or inv.get("description") or "",
+                        "student_name": stu_name or inv.get("student_id"),
+                    })
+            except Exception as inner:
+                print(f"Error querying invoices: {inner}")
+
         return {"invoices": invoices}
     except Exception as e:
         print(f"Error fetching parent invoices: {e}")
@@ -4781,17 +4812,25 @@ def get_parent_payments(current_user: AuthUser = Depends(get_current_user)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     supabase = get_supabase_client()
     try:
-        # Get parent's family
-        family_result = supabase.table('families').select('*').eq('primary_contact_email', current_user.email).execute()
-        family = family_result.data[0] if family_result.data else None
-        
-        if not family:
-            return {"payments": []}
-        
-        # Get payments for the family
-        payments_result = supabase.table('payments').select('*, invoices(*)').eq('family_id', family['id']).order('paid_at', desc=True).execute()
-        payments = payments_result.data or []
-        
+        inv_resp = get_parent_invoices(current_user)
+        invoice_ids = [i["id"] for i in inv_resp.get("invoices", []) or []]
+        payments = []
+
+        if invoice_ids:
+            try:
+                pay_res = supabase.table("payments").select("*, invoices(*)").in_("invoice_id", invoice_ids).order("paid_at", desc=True).execute()
+                for pay in pay_res.data or []:
+                    payments.append({
+                        "id": pay.get("id"),
+                        "amount": float(pay.get("amount") or 0),
+                        "paid_at": pay.get("paid_at"),
+                        "payment_method": pay.get("method"),
+                        "payment_reference": pay.get("provider_reference"),
+                        "description": (pay.get("invoices") or {}).get("term") or "",
+                    })
+            except Exception as inner:
+                print(f"Error querying payments: {inner}")
+
         return {"payments": payments}
     except Exception as e:
         print(f"Error fetching parent payments: {e}")
@@ -4805,21 +4844,24 @@ def get_parent_communications(current_user: AuthUser = Depends(get_current_user)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     supabase = get_supabase_client()
     try:
-        # Get parent's family
-        family_result = supabase.table('families').select('*').eq('primary_contact_email', current_user.email).execute()
-        family = family_result.data[0] if family_result.data else None
-        
-        if not family:
-            return {"communications": []}
-        
-        # Get communications for the family
-        communications_result = supabase.table('communications').select('*').eq('family_id', family['id']).order('sent_at', desc=True).execute()
-        communications = communications_result.data or []
-        
-        return {"communications": communications}
+        messages = []
+        try:
+            msg_res = supabase.table("message_logs").select("*").ilike("recipient", current_user.email).order("sent_at", desc=True).limit(50).execute()
+            for m in msg_res.data or []:
+                messages.append({
+                    "id": m.get("id"),
+                    "subject": m.get("subject"),
+                    "body": m.get("body"),
+                    "sent_at": m.get("sent_at"),
+                    "channel": m.get("channel"),
+                })
+        except Exception as inner:
+            print(f"Error querying message_logs: {inner}")
+
+        return {"communications": messages, "messages": messages}
     except Exception as e:
         print(f"Error fetching parent communications: {e}")
-        return {"communications": []}
+        return {"communications": [], "messages": []}
 
 
 @router.get("/student/academic-records")
@@ -4875,3 +4917,188 @@ def get_student_assignments(current_user: AuthUser = Depends(get_current_user)):
     except Exception as e:
         print(f"Error fetching student assignments: {e}")
         return {"student_id": current_user.id, "assignments": []}
+
+
+# ======================== EMAIL VERIFICATION ========================
+
+@router.post("/auth/send-verification-email")
+def send_verification_email(current_user: AuthUser = Depends(get_current_user)):
+    """Send verification email to the current user"""
+    supabase = get_supabase_client()
+    try:
+        res = supabase.auth.resend({
+            "type": "signup",
+            "email": current_user.email
+        })
+        return {"success": True, "message": "Verification email sent"}
+    except Exception as e:
+        err = str(e)
+        if "rate limit" in err.lower():
+            return {"success": False, "message": "Verification email already sent recently. Please check your inbox."}
+        raise HTTPException(status_code=500, detail=err)
+
+
+@router.post("/auth/verify-email")
+def verify_email(payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Verify a user's email using an OTP token or email link token"""
+    token_hash = payload.get("token_hash") or payload.get("token")
+    otp = payload.get("otp")
+    email = payload.get("email") or current_user.email
+    type_ = payload.get("type", "email")
+
+    supabase = get_supabase_client()
+    try:
+        if otp and email:
+            res = supabase.auth.verify_otp({
+                "email": email,
+                "token": otp,
+                "type": type_,
+            })
+        elif token_hash:
+            res = supabase.auth.verify_otp({
+                "email": email,
+                "token_hash": token_hash,
+                "type": type_,
+            })
+        else:
+            raise HTTPException(status_code=400, detail="Either OTP+email or token_hash is required")
+
+        # Update user table to mark email verified
+        try:
+            supabase.table("users").update({
+                "email_verified": True,
+                "email_verified_at": datetime.now().isoformat()
+            }).eq("id", current_user.id).execute()
+        except Exception:
+            pass
+
+        return {"success": True, "message": "Email verified successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/auth/verification-status")
+def get_verification_status(current_user: AuthUser = Depends(get_current_user)):
+    """Check current user's email verification status"""
+    supabase = get_supabase_client()
+    try:
+        auth_user = supabase.auth.admin.get_user_by_id(current_user.id)
+        email_confirmed = getattr(getattr(auth_user, "user", None), "email_confirmed_at", None) is not None
+    except Exception:
+        email_confirmed = False
+
+    try:
+        db_res = supabase.table("users").select("email_verified", "email_verified_at").eq("id", current_user.id).execute()
+        db_verified = bool(db_res.data and db_res.data[0].get("email_verified")) if db_res.data else False
+        verified_at = (db_res.data[0].get("email_verified_at") if db_res.data else None) or None
+    except Exception:
+        db_verified = False
+        verified_at = None
+
+    return {
+        "email": current_user.email,
+        "email_verified": email_confirmed or db_verified,
+        "email_verified_at": verified_at,
+        "user_id": current_user.id
+    }
+
+
+# ======================== SESSION TRACKING ========================
+
+@router.get("/sessions")
+def get_my_sessions(current_user: AuthUser = Depends(get_current_user)):
+    """Get active sessions for the current user"""
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table("user_sessions").select("*").eq("user_id", current_user.id).order("created_at", desc=True).limit(50).execute()
+        sessions = result.data or []
+        # Mark which one is the current session (heuristic: most recent valid)
+        return {
+            "sessions": sessions,
+            "total": len(sessions),
+            "active_count": len([s for s in sessions if s.get("is_active")])
+        }
+    except Exception as e:
+        return {"sessions": [], "total": 0, "active_count": 0}
+
+
+@router.get("/sessions/all")
+def get_all_sessions(current_user: AuthUser = Depends(get_current_user)):
+    """Get all sessions across the school (admin/security only)"""
+    if not has_permission(current_user, "settings:view") and current_user.role not in ("super_admin", "school_admin", "staff"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    supabase = get_supabase_client()
+    try:
+        query = supabase.table("user_sessions").select("*, users(full_name, email)")
+        if current_user.school_id:
+            query = query.eq("school_id", current_user.school_id)
+        result = query.order("created_at", desc=True).limit(200).execute()
+        sessions = result.data or []
+        return {
+            "sessions": sessions,
+            "total": len(sessions),
+            "active_count": len([s for s in sessions if s.get("is_active")])
+        }
+    except Exception as e:
+        return {"sessions": [], "total": 0, "active_count": 0}
+
+
+@router.post("/sessions/{session_id}/revoke")
+def revoke_session(session_id: str, current_user: AuthUser = Depends(get_current_user)):
+    """Revoke (logout) a specific session"""
+    supabase = get_supabase_client()
+    try:
+        # Lookup session ownership
+        sess = supabase.table("user_sessions").select("*").eq("id", session_id).execute()
+        if not sess.data:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        is_owner = sess.data[0]["user_id"] == current_user.id
+        is_admin = has_permission(current_user, "settings:view") or current_user.role in ("super_admin", "school_admin")
+        if not is_owner and not is_admin:
+            raise HTTPException(status_code=403, detail="Cannot revoke another user's session")
+
+        supabase.table("user_sessions").update({
+            "is_active": False,
+            "revoked_at": datetime.now().isoformat(),
+            "revoked_by": current_user.id
+        }).eq("id", session_id).execute()
+
+        # Try to sign out from Supabase auth if refresh_token stored
+        try:
+            refresh_token = sess.data[0].get("refresh_token")
+            if refresh_token:
+                supabase.auth.admin.sign_out(session_id)
+        except Exception:
+            pass
+
+        return {"success": True, "message": "Session revoked"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sessions/revoke-other")
+def revoke_other_sessions(current_user: AuthUser = Depends(get_current_user)):
+    """Revoke all sessions except the caller's current one"""
+    supabase = get_supabase_client()
+    try:
+        # Fetch user sessions, keep most recent active, revoke others
+        result = supabase.table("user_sessions").select("*").eq("user_id", current_user.id).eq("is_active", True).order("created_at", desc=True).execute()
+        sessions = result.data or []
+        revoked_ids = []
+        for i, s in enumerate(sessions):
+            if i == 0:
+                continue
+            supabase.table("user_sessions").update({
+                "is_active": False,
+                "revoked_at": datetime.now().isoformat(),
+                "revoked_by": current_user.id
+            }).eq("id", s["id"]).execute()
+            revoked_ids.append(s["id"])
+        return {"success": True, "revoked_count": len(revoked_ids), "revoked_ids": revoked_ids}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

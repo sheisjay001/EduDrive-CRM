@@ -203,3 +203,62 @@ class ActivityLog(Base):
     action: Mapped[str] = mapped_column(String(120), nullable=False)
     meta_data: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class BusRoute(Base):
+    __tablename__ = "bus_routes"
+
+    id: Mapped[str] = uuid_pk()
+    school_id: Mapped[str] = mapped_column(ForeignKey("schools.id"), index=True)
+    route_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    route_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    capacity: Mapped[int] = mapped_column(Integer, default=0)
+    driver_name: Mapped[str | None] = mapped_column(String(150))
+    vehicle_number: Mapped[str | None] = mapped_column(String(50))
+    status: Mapped[str] = mapped_column(String(30), default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class BusStop(Base):
+    __tablename__ = "bus_stops"
+
+    id: Mapped[str] = uuid_pk()
+    school_id: Mapped[str] = mapped_column(ForeignKey("schools.id"), index=True)
+    route_id: Mapped[str] = mapped_column(ForeignKey("bus_routes.id"), index=True)
+    stop_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    location: Mapped[str | None] = mapped_column(Text)
+    stop_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class StudentTransport(Base):
+    __tablename__ = "student_transport"
+
+    id: Mapped[str] = uuid_pk()
+    school_id: Mapped[str] = mapped_column(ForeignKey("schools.id"), index=True)
+    student_id: Mapped[str] = mapped_column(ForeignKey("students.id"), index=True)
+    route_id: Mapped[str] = mapped_column(ForeignKey("bus_routes.id"), index=True)
+    stop_id: Mapped[str | None] = mapped_column(ForeignKey("bus_stops.id"))
+    pickup_location: Mapped[str | None] = mapped_column(Text)
+    dropoff_location: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(30), default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Vehicle(Base):
+    __tablename__ = "vehicles"
+
+    id: Mapped[str] = uuid_pk()
+    school_id: Mapped[str] = mapped_column(ForeignKey("schools.id"), index=True)
+    vehicle_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    vehicle_type: Mapped[str] = mapped_column(String(50))
+    capacity: Mapped[int] = mapped_column(Integer, default=0)
+    driver_name: Mapped[str | None] = mapped_column(String(150))
+    driver_phone: Mapped[str | None] = mapped_column(String(30))
+    last_known_lat: Mapped[float | None] = mapped_column(Float)
+    last_known_lng: Mapped[float | None] = mapped_column(Float)
+    last_updated: Mapped[datetime | None] = mapped_column(DateTime)
+    status: Mapped[str] = mapped_column(String(30), default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

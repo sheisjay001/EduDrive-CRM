@@ -231,11 +231,13 @@ def has_permission(user: AuthUser, permission: str) -> bool:
     """Check if user has a specific permission based on their role"""
     role_permissions = {
         "super_admin": ["*"],  # Full system access
-        "school_admin": ["dashboard:view", "admissions:*", "leads:*", "families:*", "parents:*", "students:*", "finance:*", "invoices:*", "payments:*", "messaging:*", "helpdesk:*", "tickets:*", "staff:*", "reports:*", "settings:*"],
-        "admissions_officer": ["dashboard:view", "admissions:view", "leads:*", "parents:view"],
-        "bursar": ["dashboard:view", "finance:view", "invoices:*", "payments:*", "students:view"],
-        "teacher": ["dashboard:view", "students:view", "attendance:*", "behavior:*", "academic:*", "parents:view"],
-        "helpdesk_officer": ["dashboard:view", "helpdesk:*", "tickets:*", "parents:view"],
+        "school_admin": ["dashboard:view", "admissions:*", "leads:*", "families:*", "parents:*", "students:*", "finance:*", "invoices:*", "payments:*", "messaging:*", "helpdesk:*", "tickets:*", "staff:*", "reports:*", "settings:*", "calendar:*", "terms:*", "classes:*", "analytics:*", "debtors:*", "bulk-billing:*", "receipts:*", "lost-leads:*", "workload:*", "user-admin:*", "activity:*", "frontdesk:*", "lifecycle:*", "transport:*"],
+        "admissions_officer": ["dashboard:view", "admissions:view", "leads:*", "parents:view", "calendar:*", "lost-leads:*", "messaging:view", "messaging:create", "reminders:*"],
+        "bursar": ["dashboard:view", "finance:view", "invoices:*", "payments:*", "students:view", "debtors:*", "bulk-billing:*", "receipts:*", "reports:view", "messaging:view", "reminders:*"],
+        "teacher": ["dashboard:view", "students:view", "attendance:*", "behavior:*", "academic:*", "parents:view", "lifecycle:*", "classes:view", "workload:view-own", "reports:view-own"],
+        "helpdesk_officer": ["dashboard:view", "helpdesk:*", "tickets:*", "parents:view", "students:view"],
+        "parent": ["dashboard:view", "students:view-own", "tickets:create", "tickets:view-own", "payments:create", "payments:view-own", "invoices:view-own", "receipts:view-own", "lifecycle:view-own", "transport:view-own", "messages:view-own"],
+        "student": ["dashboard:view", "students:view-self", "tickets:create", "tickets:view-own", "lifecycle:view-self", "attendance:view-self", "academic:view-self"],
     }
     
     user_perms = role_permissions.get(user.role, [])
@@ -251,6 +253,24 @@ def has_permission(user: AuthUser, permission: str) -> bool:
     # Check for wildcard prefix match (e.g., "admissions:*" matches "admissions:create")
     for perm in user_perms:
         if perm.endswith(":*") and permission.startswith(perm[:-2]):
+            return True
+    
+    # Normalize data-scoped suffixes: tickets:view-own -> tickets:view
+    def normalize_action(p: str) -> str:
+        for suffix in ("-own", "-self"):
+            idx = p.rfind(suffix)
+            if idx != -1 and idx > p.find(":"):
+                return p[:idx]
+        return p
+    
+    normalized_permission = normalize_action(permission)
+    if normalized_permission != permission and normalized_permission in user_perms:
+        return True
+    for perm in user_perms:
+        normalized_grant = normalize_action(perm)
+        if normalized_grant == normalized_permission:
+            return True
+        if normalized_grant.endswith(":*") and normalized_permission.startswith(normalized_grant[:-2]):
             return True
     
     return False

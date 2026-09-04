@@ -48,7 +48,7 @@ async def get_current_workload(
         result = supabase.table('current_workload_status').select('*').execute()
         return {"workload": result.data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail(str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/summary-by-role")
 async def get_workload_summary_by_role(
@@ -63,7 +63,7 @@ async def get_workload_summary_by_role(
         result = supabase.table('workload_summary_by_role').select('*').execute()
         return {"summary": result.data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail(str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/performance-trends")
 async def get_performance_trends(

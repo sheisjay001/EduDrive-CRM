@@ -64,7 +64,7 @@ async def get_lost_reason_categories(
         result = supabase.rpc('get_lost_reason_categories').execute()
         return {"categories": result.data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail(str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/analytics")
 async def get_lost_lead_analytics(
@@ -79,7 +79,7 @@ async def get_lost_lead_analytics(
         result = supabase.table('lost_lead_analytics').select('*').execute()
         return {"analytics": result.data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail(str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/competitor-analysis")
 async def get_competitor_analysis(
@@ -94,7 +94,7 @@ async def get_competitor_analysis(
         result = supabase.table('competitor_analysis').select('*').execute()
         return {"competitors": result.data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail(str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/trends")
 async def get_lost_lead_trends(
@@ -109,4 +109,4 @@ async def get_lost_lead_trends(
         result = supabase.table('lost_lead_trends').select('*').execute()
         return {"trends": result.data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail(str(e))
+        raise HTTPException(status_code=500, detail=str(e))
