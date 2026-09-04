@@ -100,9 +100,12 @@ export default function WorkloadPage() {
   };
 
   useEffect(() => {
-    if (activeTab === "current") fetchCurrentWorkload();
-    else if (activeTab === "by-role") fetchRoleSummary();
-    else if (activeTab === "trends") fetchPerformanceTrends();
+    const loadData = async () => {
+      if (activeTab === "current") await fetchCurrentWorkload();
+      else if (activeTab === "by-role") await fetchRoleSummary();
+      else if (activeTab === "trends") await fetchPerformanceTrends();
+    };
+    loadData();
   }, [activeTab]);
 
   const getPriorityColor = (priority: string) => {

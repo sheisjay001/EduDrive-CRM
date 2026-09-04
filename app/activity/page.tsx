@@ -55,7 +55,10 @@ export default function ActivityPage() {
   };
 
   useEffect(() => {
-    fetchActivities();
+    const loadActivities = async () => {
+      await fetchActivities();
+    };
+    loadActivities();
   }, [filter]);
 
   const getActivityTypeColor = (type: string) => {

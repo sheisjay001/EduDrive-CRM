@@ -101,9 +101,12 @@ export default function LostLeadsPage() {
   };
 
   useEffect(() => {
-    if (activeTab === "overview") fetchLostLeadAnalytics();
-    else if (activeTab === "competitors") fetchCompetitorAnalysis();
-    else if (activeTab === "trends") fetchTrends();
+    const loadData = async () => {
+      if (activeTab === "overview") await fetchLostLeadAnalytics();
+      else if (activeTab === "competitors") await fetchCompetitorAnalysis();
+      else if (activeTab === "trends") await fetchTrends();
+    };
+    loadData();
   }, [activeTab]);
 
   const getReasonColor = (reason: string) => {

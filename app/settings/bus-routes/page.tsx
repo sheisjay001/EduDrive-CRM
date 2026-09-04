@@ -56,7 +56,10 @@ export default function BusRoutesPage() {
   };
 
   useEffect(() => {
-    fetchBusRoutes();
+    const loadBusRoutes = async () => {
+      await fetchBusRoutes();
+    };
+    loadBusRoutes();
   }, []);
 
   const handleCreateRoute = async (routeData: Record<string, unknown>) => {

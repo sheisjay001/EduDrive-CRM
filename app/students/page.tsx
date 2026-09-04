@@ -13,10 +13,10 @@ import { apiClient } from "@/services/api-client";
 export default function StudentsPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [editingStudent, setEditingStudent] = useState<string | null>(null);
-  const [editFormData, setEditFormData] = useState({});
+  const [editFormData, setEditFormData] = useState<Record<string, unknown>>({});
   const [showAddForm, setShowAddForm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [students, setStudents] = useState<any[]>([]);
+  const [students, setStudents] = useState<Record<string, unknown>[]>([]);
 
   const user = getUser();
   const userRole = (user as { role?: string })?.role || "school_admin";

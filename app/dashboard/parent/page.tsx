@@ -72,7 +72,7 @@ export default function ParentDashboardPage() {
       if (iRes.status === "fulfilled" && iRes.value) setInvoices(iRes.value.invoices || iRes.value || []);
       if (pRes.status === "fulfilled" && pRes.value) setPayments(pRes.value.payments || pRes.value || []);
       if (mRes.status === "fulfilled" && mRes.value) setMessages(mRes.value.communications || mRes.value.messages || []);
-    }).catch((e) => setError(String(e))
+    }).catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
   }, []);
 

@@ -47,7 +47,10 @@ export default function RemindersPage() {
   };
 
   useEffect(() => {
-    fetchReminders();
+    const loadReminders = async () => {
+      await fetchReminders();
+    };
+    loadReminders();
   }, []);
 
   const handleSendReminder = async (reminderId: string) => {

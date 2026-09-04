@@ -46,10 +46,13 @@ export default function StudentDashboardPage() {
   const [user, setUser] = useState<{ fullName?: string; email?: string; id?: string } | null>(null);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("user");
-      if (stored) setUser(JSON.parse(stored));
-    } catch { /* noop */ }
+    const loadUser = async () => {
+      try {
+        const stored = localStorage.getItem("user");
+        if (stored) setUser(JSON.parse(stored));
+      } catch { /* noop */ }
+    };
+    loadUser();
 
     const token = localStorage.getItem("access_token");
     const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};

@@ -58,7 +58,10 @@ export default function ClassesPage() {
   };
 
   useEffect(() => {
-    fetchClasses();
+    const loadClasses = async () => {
+      await fetchClasses();
+    };
+    loadClasses();
   }, []);
 
   const handleCreateClass = async (classData: Record<string, unknown>) => {

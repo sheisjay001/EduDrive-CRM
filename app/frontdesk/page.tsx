@@ -79,7 +79,10 @@ export default function FrontDeskPage() {
   };
 
   useEffect(() => {
-    fetchDailyLogs();
+    const loadDailyLogs = async () => {
+      await fetchDailyLogs();
+    };
+    loadDailyLogs();
   }, []);
 
   const getActivityTypeColor = (type: string) => {

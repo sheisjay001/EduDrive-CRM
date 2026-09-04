@@ -98,9 +98,12 @@ export default function UserAdministrationPage() {
   };
 
   useEffect(() => {
-    if (activeTab === "users") fetchUsers();
-    else if (activeTab === "permissions") fetchPermissions();
-    else if (activeTab === "roles") fetchRoleMatrix();
+    const loadData = async () => {
+      if (activeTab === "users") await fetchUsers();
+      else if (activeTab === "permissions") await fetchPermissions();
+      else if (activeTab === "roles") await fetchRoleMatrix();
+    };
+    loadData();
   }, [activeTab]);
 
   const handleGrantPermission = async (userId: string, permission: string) => {

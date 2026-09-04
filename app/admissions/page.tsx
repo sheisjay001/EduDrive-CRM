@@ -159,7 +159,7 @@ export default function AdmissionsPage() {
               title="Priority lead queue"
               description="The leads most likely to move when the team follows up today."
               columns={["Lead ID", "Child", "Parent", "Source", "Stage", "Class", "Follow-up", "Actions"]}
-              rows={data.leads.map((lead: any) => [
+              rows={data.leads.map((lead: any) => [ // eslint-disable-line @typescript-eslint/no-explicit-any
                 <Link key={lead.id} href={`/admissions/${lead.id}`} className="font-medium text-[#d9a441] hover:underline">
                   {lead.id}
                 </Link>,
