@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { LoadingPanel } from "@/components/dashboard/ops-primitives";
 import { useFeeStructuresQuery } from "@/hooks/use-crm-query";
 import { Plus, Edit, Trash2, Save, X } from "lucide-react";
-import { getUser } from "@/services/auth-storage";
+import { getUser, getAccessToken } from "@/services/auth-storage";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -33,7 +33,7 @@ export default function FeeStructuresPage() {
     try {
       const response = await fetch(`${API_URL}/finance/fee-structures/${feeId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAccessToken()}` },
         body: JSON.stringify(editFormData),
       });
       if (response.ok) { setEditingFee(null); refetch(); alert("Fee structure updated"); }
@@ -47,7 +47,7 @@ export default function FeeStructuresPage() {
     try {
       const response = await fetch(`${API_URL}/finance/fee-structures/${feeId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+        headers: { Authorization: `Bearer ${getAccessToken()}` },
       });
       if (response.ok) { refetch(); alert("Fee structure deleted"); }
     } catch { alert("Error deleting fee structure"); }
@@ -57,7 +57,7 @@ export default function FeeStructuresPage() {
     try {
       const response = await fetch(`${API_URL}/finance/fee-structures`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAccessToken()}` },
         body: JSON.stringify(addFormData),
       });
       if (response.ok) { setShowAddForm(false); setAddFormData({ class_id: "", term_name: "", title: "", amount: "", due_days: "" }); refetch(); alert("Fee structure created"); }

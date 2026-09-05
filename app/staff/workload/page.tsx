@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
 import { User, TrendingUp, AlertCircle, CheckCircle } from "lucide-react";
+import { getAccessToken } from "@/services/auth-storage";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -50,7 +51,7 @@ export default function WorkloadPage() {
     try {
       const response = await fetch(`${API_URL}/workload/current`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       });
       
@@ -69,7 +70,7 @@ export default function WorkloadPage() {
     try {
       const response = await fetch(`${API_URL}/workload/summary-by-role`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       });
       
@@ -86,7 +87,7 @@ export default function WorkloadPage() {
     try {
       const response = await fetch(`${API_URL}/workload/performance-trends`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       });
       

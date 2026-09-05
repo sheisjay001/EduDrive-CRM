@@ -10,6 +10,7 @@ import {
   User, BookOpen, CalendarCheck, ClipboardList, AlertCircle,
   MessageSquare, Ticket, GraduationCap, Calendar, ChevronRight, Award, Clock
 } from "lucide-react";
+import { getAccessToken, getUser as getStoredUser } from "@/services/auth-storage";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -43,18 +44,20 @@ export default function StudentDashboardPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [academic, setAcademic] = useState<AcademicRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<{ fullName?: string; email?: string; id?: string } | null>(null);
+  const [user] = useState<{ fullName?: string; email?: string; id?: string } | null>(() => {
+    const stored = getStoredUser();
+    if (stored) {
+      return {
+        fullName: (stored as { fullName?: string }).fullName,
+        email: (stored as { email?: string }).email,
+        id: (stored as { id?: string }).id,
+      };
+    }
+    return null;
+  });
 
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const stored = localStorage.getItem("user");
-        if (stored) setUser(JSON.parse(stored));
-      } catch { /* noop */ }
-    };
-    loadUser();
-
-    const token = localStorage.getItem("access_token");
+    const token = getAccessToken();
     const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
     Promise.allSettled([
       fetch(`${API_URL}/student/attendance`, { headers }).then(r => r.ok ? r.json() : null),
@@ -80,6 +83,7 @@ export default function StudentDashboardPage() {
       eyebrow="Student Portal"
       title="My Academic Dashboard"
       description="Track attendance, assignments, grades, and school communication in one place."
+      allowedRoles={["student"]}
     >
       {loading ? (
         <LoadingPanel />

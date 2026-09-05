@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getAccessToken } from "@/services/auth-storage";
 
 type ExportFormat = "pdf" | "excel" | "csv";
 
@@ -51,7 +52,7 @@ export function useReportExport() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify(data),
       });
@@ -83,7 +84,7 @@ export function useReportExport() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify(data),
       });
@@ -146,7 +147,7 @@ export function useReportExport() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify({
           ...data,

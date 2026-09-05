@@ -1,20 +1,35 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { saveAuthTokens, saveUser, getAccessToken } from "@/services/auth-storage";
+import { getHomeRouteForRole } from "@/app/login/page";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
-export default function StudentLoginPage() {
+const SAFE_REDIRECT_RE = /^\/[a-zA-Z0-9\-_/%?=&.]*$/;
+function safeRedirect(raw: string | null, fallback: string): string {
+  if (!raw) return fallback;
+  return SAFE_REDIRECT_RE.test(raw) ? raw : fallback;
+}
+
+function StudentLoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (getAccessToken()) {
+      router.replace("/dashboard/student");
+    }
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,18 +49,17 @@ export default function StudentLoginPage() {
         throw new Error(data.detail || "Student login failed");
       }
 
-      // Check if user has student role
       if (data.user.role !== "student") {
         throw new Error("This login is for students only");
       }
 
-      // Store tokens
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      saveAuthTokens(data.access_token, data.refresh_token || "");
+      saveUser(data.user);
 
-      // Redirect to student portal
-      router.push("/dashboard/student");
+      const fallback = getHomeRouteForRole("student");
+      const requested = searchParams?.get("redirect") || null;
+      const redirectPath = safeRedirect(requested, fallback);
+      router.replace(redirectPath);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Student login failed");
     } finally {
@@ -114,5 +128,20 @@ export default function StudentLoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function StudentLoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-500" />
+          <p className="text-sm text-gray-500">Loading login…</p>
+        </div>
+      </div>
+    }>
+      <StudentLoginPageInner />
+    </Suspense>
   );
 }

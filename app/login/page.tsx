@@ -1,14 +1,39 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSchool } from "@/lib/school-context";
+import { saveAuthTokens, saveUser, getAccessToken } from "@/services/auth-storage";
 
-export default function LoginPage() {
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
+
+export const ROLE_HOME_MAP: Record<string, string> = {
+  super_admin: "/dashboard/super-admin",
+  school_admin: "/dashboard/school-admin",
+  admissions_officer: "/dashboard/admissions",
+  bursar: "/dashboard/bursar",
+  teacher: "/dashboard/teacher",
+  helpdesk_officer: "/dashboard/helpdesk",
+  parent: "/dashboard/parent",
+  student: "/dashboard/student",
+};
+
+export function getHomeRouteForRole(role: string): string {
+  return ROLE_HOME_MAP[role] || "/dashboard";
+}
+
+const SAFE_REDIRECT_RE = /^\/[a-zA-Z0-9\-_/%?=&.]*$/;
+function safeRedirect(raw: string | null, fallback: string): string {
+  if (!raw) return fallback;
+  return SAFE_REDIRECT_RE.test(raw) ? raw : fallback;
+}
+
+function LoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { schoolSlug, schoolInfo } = useSchool();
   
   const [email, setEmail] = useState("");
@@ -16,13 +41,27 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    if (getAccessToken()) {
+      const stored = localStorage.getItem("edudrive_user");
+      let role = "school_admin";
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed?.role) role = parsed.role;
+        } catch { /* noop */ }
+      }
+      router.replace(getHomeRouteForRole(role));
+    }
+  }, [router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/v1/auth/login", {
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -34,34 +73,15 @@ export default function LoginPage() {
         throw new Error(data.detail || "Login failed");
       }
 
-      // Store tokens
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      saveAuthTokens(data.access_token, data.refresh_token || "");
+      saveUser(data.user);
 
-      // Role-based routing
       const userRole = data.user.role;
-      let redirectPath = "/dashboard";
+      const fallback = getHomeRouteForRole(userRole);
+      const requested = searchParams?.get("redirect") || null;
+      const redirectPath = safeRedirect(requested, fallback);
       
-      if (userRole === "parent") {
-        redirectPath = "/parents";
-      } else if (userRole === "student") {
-        redirectPath = "/students";
-      } else if (userRole === "super_admin") {
-        redirectPath = "/dashboard/super-admin";
-      } else if (userRole === "school_admin") {
-        redirectPath = "/dashboard/school-admin";
-      } else if (userRole === "admissions_officer") {
-        redirectPath = "/dashboard/admissions";
-      } else if (userRole === "bursar") {
-        redirectPath = "/dashboard/bursar";
-      } else if (userRole === "teacher") {
-        redirectPath = "/dashboard/teacher";
-      } else if (userRole === "helpdesk_officer") {
-        redirectPath = "/dashboard/helpdesk";
-      }
-      
-      router.push(redirectPath);
+      router.replace(redirectPath);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -140,5 +160,20 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-500" />
+          <p className="text-sm text-gray-500">Loading login…</p>
+        </div>
+      </div>
+    }>
+      <LoginPageInner />
+    </Suspense>
   );
 }

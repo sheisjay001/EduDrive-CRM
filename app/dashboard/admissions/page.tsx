@@ -14,6 +14,7 @@ export default function AdmissionsDashboardPage() {
       eyebrow="Admissions Dashboard"
       title="Lead Management Center"
       description="Track prospective students, manage tours, and convert leads to enrollments."
+      allowedRoles={["super_admin", "school_admin", "admissions_officer"]}
     >
       {isLoading || !data ? (
         <LoadingPanel />

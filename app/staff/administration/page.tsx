@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
 import { Plus, User, Shield, Key } from "lucide-react";
+import { getAccessToken } from "@/services/auth-storage";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -44,7 +45,7 @@ export default function UserAdministrationPage() {
     try {
       const response = await fetch(`${API_URL}/staff/overview`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       });
       
@@ -63,7 +64,7 @@ export default function UserAdministrationPage() {
     try {
       const response = await fetch(`${API_URL}/user-admin/permissions/summary`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       });
       
@@ -82,7 +83,7 @@ export default function UserAdministrationPage() {
     try {
       const response = await fetch(`${API_URL}/user-admin/role-matrix`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       });
       
@@ -112,7 +113,7 @@ export default function UserAdministrationPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify({ user_id: userId, permission_name: permission, action: "grant" }),
       });
@@ -131,7 +132,7 @@ export default function UserAdministrationPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify({ user_id: userId, permission_name: permission, action: "revoke" }),
       });

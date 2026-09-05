@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LoadingPanel } from "@/components/dashboard/ops-primitives";
 import { useSettingsQuery } from "@/hooks/use-crm-query";
-import { getUser } from "@/services/auth-storage";
+import { getUser, getAccessToken } from "@/services/auth-storage";
 import { CreditCard, Plus, Trash2, Lock } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
@@ -60,7 +60,7 @@ export default function SettingsPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify(formData),
       });

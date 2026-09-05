@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingPanel } from "@/components/dashboard/ops-primitives";
 import { MapPin, User, Bus, Plus } from "lucide-react";
+import { getAccessToken } from "@/services/auth-storage";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -40,7 +41,7 @@ export default function BusRoutesPage() {
     try {
       const response = await fetch(`${API_URL}/bus-routes`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       });
       
@@ -68,7 +69,7 @@ export default function BusRoutesPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify(routeData),
       });
@@ -88,7 +89,7 @@ export default function BusRoutesPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify(stopData),
       });

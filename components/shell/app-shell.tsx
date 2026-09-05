@@ -1,12 +1,17 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
+  BookOpen,
+  Bus,
+  CalendarCheck,
   ChartSpline,
   CreditCard,
   FileBarChart2,
+  FileText,
   GraduationCap,
   LayoutDashboard,
   LifeBuoy,
@@ -15,6 +20,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Ticket,
   Users,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -22,25 +28,71 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn, initialsFromName } from "@/lib/utils";
 import { clearAuthTokens } from "@/services/auth-storage";
-
 import { getUser } from "@/services/auth-storage";
+import { RouteGuard, type UserRole } from "@/components/shell/route-guard";
 
-const allNavigation = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles: string[];
+};
+
+const STAFF_ROLES: UserRole[] = [
+  "super_admin",
+  "school_admin",
+  "admissions_officer",
+  "bursar",
+  "teacher",
+  "helpdesk_officer",
+];
+
+const ALL_ROLES: UserRole[] = [...STAFF_ROLES, "parent", "student"];
+
+const staffNavigation: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["super_admin", "school_admin", "admissions_officer", "bursar", "teacher", "helpdesk_officer"] },
   { href: "/admissions", label: "Admissions", icon: ChartSpline, roles: ["super_admin", "school_admin", "admissions_officer"] },
   { href: "/families", label: "Families", icon: Users, roles: ["super_admin", "school_admin"] },
   { href: "/parents", label: "Parents", icon: Sparkles, roles: ["super_admin", "school_admin", "admissions_officer", "teacher", "helpdesk_officer"] },
-  { href: "/students", label: "Students", icon: GraduationCap, roles: ["super_admin", "school_admin", "bursar", "teacher"] },
-  { href: "/finance", label: "Finance", icon: CreditCard, roles: ["super_admin", "school_admin", "bursar"] },
-  { href: "/messaging", label: "Messaging", icon: MessageSquareText, roles: ["super_admin", "school_admin"] },
-  { href: "/helpdesk", label: "Help Desk", icon: LifeBuoy, roles: ["super_admin", "school_admin", "helpdesk_officer"] },
+  { href: "/students", label: "Students", icon: GraduationCap, roles: ["super_admin", "school_admin", "bursar", "teacher", "parent", "student"] },
+  { href: "/finance", label: "Finance", icon: CreditCard, roles: ["super_admin", "school_admin", "bursar", "parent"] },
+  { href: "/messaging", label: "Messaging", icon: MessageSquareText, roles: ["super_admin", "school_admin", "parent", "student"] },
+  { href: "/helpdesk", label: "Help Desk", icon: LifeBuoy, roles: ["super_admin", "school_admin", "helpdesk_officer", "parent", "student"] },
   { href: "/staff", label: "Staff", icon: ShieldCheck, roles: ["super_admin", "school_admin"] },
-  { href: "/reports", label: "Reports", icon: FileBarChart2, roles: ["super_admin", "school_admin"] },
-  { href: "/settings", label: "Settings", icon: Settings, roles: ["super_admin", "school_admin"] },
+  { href: "/reports", label: "Reports", icon: FileBarChart2, roles: ["super_admin", "school_admin", "student"] },
+  { href: "/settings", label: "Settings", icon: Settings, roles: ["super_admin", "school_admin", "parent"] },
+  { href: "/activity", label: "Activity", icon: Sparkles, roles: ["super_admin", "school_admin"] },
+  { href: "/analytics", label: "Analytics", icon: ChartSpline, roles: ["super_admin", "school_admin"] },
+  { href: "/frontdesk", label: "Frontdesk", icon: LifeBuoy, roles: ["super_admin", "school_admin"] },
+  { href: "/reminders", label: "Reminders", icon: CalendarCheck, roles: ["super_admin", "school_admin", "admissions_officer", "bursar", "student"] },
 ];
 
-function getNavigationForRole(role: string) {
-  return allNavigation.filter(item => item.roles.includes(role));
+const parentNavigation: NavItem[] = [
+  { href: "/dashboard/parent", label: "Dashboard", icon: LayoutDashboard, roles: ["parent"] },
+  { href: "/students", label: "My Children", icon: Users, roles: ["parent"] },
+  { href: "/finance", label: "Invoices & Payments", icon: CreditCard, roles: ["parent"] },
+  { href: "/helpdesk", label: "Support Tickets", icon: Ticket, roles: ["parent"] },
+  { href: "/messaging", label: "Messages", icon: MessageSquareText, roles: ["parent"] },
+  { href: "/settings/bus-routes", label: "Transport", icon: Bus, roles: ["parent"] },
+];
+
+const studentNavigation: NavItem[] = [
+  { href: "/dashboard/student", label: "Dashboard", icon: LayoutDashboard, roles: ["student"] },
+  { href: "/students", label: "My Profile", icon: Users, roles: ["student"] },
+  { href: "/helpdesk", label: "Report Issue", icon: Ticket, roles: ["student"] },
+  { href: "/messaging", label: "Messages", icon: MessageSquareText, roles: ["student"] },
+  { href: "/reminders", label: "Schedule", icon: CalendarCheck, roles: ["student"] },
+  { href: "/reports", label: "Results", icon: FileText, roles: ["student"] },
+];
+
+function getNavigationForRole(role: string): NavItem[] {
+  if (role === "parent") {
+    return parentNavigation.filter(item => item.roles.includes(role));
+  }
+  if (role === "student") {
+    return studentNavigation.filter(item => item.roles.includes(role));
+  }
+  return staffNavigation.filter(item => item.roles.includes(role));
 }
 
 type AppShellProps = {
@@ -48,13 +100,14 @@ type AppShellProps = {
   eyebrow: string;
   description: string;
   children: React.ReactNode;
+  allowedRoles?: readonly UserRole[];
 };
 
-export function AppShell({ title, eyebrow, description, children }: AppShellProps) {
+function AppShellInner({ title, eyebrow, description, children, allowedRoles, user }: AppShellProps & { user: ReturnType<typeof getUser> }) {
   const pathname = usePathname();
   const router = useRouter();
-  const user = getUser();
   const userRole = (user as { role?: string })?.role || "school_admin";
+  const userName = (user as { fullName?: string })?.fullName || "User";
   const navigation = getNavigationForRole(userRole);
 
   const handleLogout = () => {
@@ -63,7 +116,8 @@ export function AppShell({ title, eyebrow, description, children }: AppShellProp
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(217,164,65,0.16),_transparent_22%),linear-gradient(180deg,#14213d_0%,#0b1225_55%,#080d19_100%)] text-[#f6f1e8]">
+    <RouteGuard allowedRoles={allowedRoles}>
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(217,164,65,0.16),_transparent_22%),linear-gradient(180deg,#14213d_0%,#0b1225_55%,#080d19_100%)] text-[#f6f1e8]">
       <div className="mx-auto grid min-h-screen max-w-[1600px] gap-6 px-4 py-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:px-6">
         <Card className="flex flex-col gap-6 overflow-hidden">
           <div className="rounded-[24px] border border-white/10 bg-white/6 p-5">
@@ -71,9 +125,15 @@ export function AppShell({ title, eyebrow, description, children }: AppShellProp
               <Badge tone="warn">EduDrive CRM</Badge>
               <Sparkles className="h-4 w-4 text-[#d9a441]" />
             </div>
-            <h2 className="font-serif text-2xl text-white">Greenfield College</h2>
+            <h2 className="font-serif text-2xl text-white">
+              {userRole === "parent" ? "Parent Portal" : userRole === "student" ? "Student Portal" : "Greenfield College"}
+            </h2>
             <p className="mt-2 text-sm leading-6 text-[#9eb1cf]">
-              A modern operations command center for admissions, finance, parent care, and reporting.
+              {userRole === "parent"
+                ? "Your children's academic journey and school updates in one place."
+                : userRole === "student"
+                ? "Track your attendance, assignments, and academic progress."
+                : "A modern operations command center for admissions, finance, parent care, and reporting."}
             </p>
           </div>
 
@@ -131,7 +191,7 @@ export function AppShell({ title, eyebrow, description, children }: AppShellProp
                 7 alerts
               </Button>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#d9a441]/30 bg-[#d9a441]/10 text-sm font-semibold text-white">
-                {initialsFromName("Joy Auta")}
+                {initialsFromName(userName)}
               </div>
             </div>
           </header>
@@ -139,6 +199,25 @@ export function AppShell({ title, eyebrow, description, children }: AppShellProp
           {children}
         </div>
       </div>
-    </div>
+      </div>
+    </RouteGuard>
+  );
+}
+
+export function AppShell({ title, eyebrow, description, children, allowedRoles = ALL_ROLES }: AppShellProps) {
+  const user = getUser();
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#0b1225] text-[#f6f1e8]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#d9a441]/30 border-t-[#d9a441]" />
+          <p className="text-sm text-[#9eb1cf]">Loading shell…</p>
+        </div>
+      </div>
+    }>
+      <AppShellInner title={title} eyebrow={eyebrow} description={description} allowedRoles={allowedRoles} user={user}>
+        {children}
+      </AppShellInner>
+    </Suspense>
   );
 }

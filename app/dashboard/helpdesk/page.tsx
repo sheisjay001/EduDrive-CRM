@@ -14,6 +14,7 @@ export default function HelpdeskDashboardPage() {
       eyebrow="Helpdesk Dashboard"
       title="Support & Ticket Management"
       description="Track parent inquiries, manage support tickets, and ensure timely resolution of issues."
+      allowedRoles={["super_admin", "school_admin", "helpdesk_officer"]}
     >
       {isLoading || !data ? (
         <LoadingPanel />

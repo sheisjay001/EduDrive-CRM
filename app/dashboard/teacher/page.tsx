@@ -1,35 +1,37 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AppShell } from "@/components/shell/app-shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { KpiGrid, LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
 import { useDashboardQuery } from "@/hooks/use-crm-query";
-import { Upload, Users, CheckCircle, XCircle, User, BookOpen, Mail, Phone } from "lucide-react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
+import { Upload, Users, CheckCircle, User, BookOpen, Mail, Phone } from "lucide-react";
+import { getUser as getStoredUser } from "@/services/auth-storage";
 
 export default function TeacherDashboardPage() {
   const { data, isLoading } = useDashboardQuery();
-  const [user, setUser] = useState<{ fullName?: string; email?: string; id?: string } | null>(null);
+  const [user] = useState<{ fullName?: string; email?: string; id?: string } | null>(() => {
+    const stored = getStoredUser();
+    if (stored) {
+      return {
+        fullName: (stored as { fullName?: string }).fullName,
+        email: (stored as { email?: string }).email,
+        id: (stored as { id?: string }).id,
+      };
+    }
+    return null;
+  });
 
-  useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const stored = localStorage.getItem("user");
-        if (stored) setUser(JSON.parse(stored));
-      } catch { /* noop */ }
-    };
-    loadUser();
-  }, []);
+
 
   return (
     <AppShell
       eyebrow="Teacher Dashboard"
       title="Classroom Management"
       description="Track student attendance, behavior, academic performance, and parent communications."
+      allowedRoles={["super_admin", "school_admin", "teacher"]}
     >
       {isLoading || !data ? (
         <LoadingPanel />

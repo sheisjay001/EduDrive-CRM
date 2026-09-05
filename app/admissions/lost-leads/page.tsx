@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
 import { Building2, DollarSign, AlertTriangle, TrendingDown } from "lucide-react";
+import { getAccessToken } from "@/services/auth-storage";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -51,7 +52,7 @@ export default function LostLeadsPage() {
     try {
       const response = await fetch(`${API_URL}/lost-leads/analytics`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       });
       
@@ -70,7 +71,7 @@ export default function LostLeadsPage() {
     try {
       const response = await fetch(`${API_URL}/lost-leads/competitor-analysis`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       });
       
@@ -87,7 +88,7 @@ export default function LostLeadsPage() {
     try {
       const response = await fetch(`${API_URL}/lost-leads/trends`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       });
       

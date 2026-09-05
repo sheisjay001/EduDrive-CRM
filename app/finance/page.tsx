@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { DataTable, KpiGrid, LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
 import { useFeeStructuresQuery, useFinanceQuery } from "@/hooks/use-crm-query";
 import { Edit, Trash2, Save, X } from "lucide-react";
-import { getUser } from "@/services/auth-storage";
+import { getUser, getAccessToken } from "@/services/auth-storage";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -33,7 +33,7 @@ export default function FinancePage() {
     try {
       const response = await fetch(`${API_URL}/invoices/${invoiceId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAccessToken()}` },
         body: JSON.stringify(editFormData),
       });
       if (response.ok) { setEditingInvoice(null); refetch(); alert("Invoice updated"); }
@@ -47,7 +47,7 @@ export default function FinancePage() {
     try {
       const response = await fetch(`${API_URL}/invoices/${invoiceId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+        headers: { Authorization: `Bearer ${getAccessToken()}` },
       });
       if (response.ok) { refetch(); alert("Invoice deleted"); }
     } catch { alert("Error deleting invoice"); }

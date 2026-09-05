@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { getAccessToken } from "@/services/auth-storage";
 
 interface FileUploadOptions {
   maxSize?: number; // in bytes
@@ -51,7 +52,7 @@ export function useFileUpload(options: FileUploadOptions = {}) {
       const response = await fetch(`${API_URL}/documents/upload`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: formData,
       });

@@ -14,6 +14,7 @@ export default function BursarDashboardPage() {
       eyebrow="Finance Dashboard"
       title="Fee Collections & Payments"
       description="Monitor invoice status, track payments, and manage school revenue operations."
+      allowedRoles={["super_admin", "school_admin", "bursar"]}
     >
       {isLoading || !data ? (
         <LoadingPanel />

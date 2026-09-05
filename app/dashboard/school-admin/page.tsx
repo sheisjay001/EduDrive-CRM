@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { KpiGrid, LoadingPanel, SectionTitle, TrendPanel } from "@/components/dashboard/ops-primitives";
 import { useDashboardQuery } from "@/hooks/use-crm-query";
 import { Plus, Play, Edit, Trash2, Clock } from "lucide-react";
+import { getAccessToken } from "@/services/auth-storage";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -23,31 +24,36 @@ interface CBTExam {
 export default function SchoolAdminDashboardPage() {
   const { data, isLoading } = useDashboardQuery();
   const [exams, setExams] = useState<CBTExam[]>([]);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [, setShowCreateDialog] = useState(false);
 
   useEffect(() => {
-    fetchExams();
-  }, []);
-
-  const fetchExams = async () => {
-    try {
-      const response = await fetch(`${API_URL}/cbt/exams`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setExams(data.exams || []);
+    let cancelled = false;
+    const fetchExams = async () => {
+      try {
+        const token = getAccessToken();
+        const response = await fetch(`${API_URL}/cbt/exams`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (response.ok && !cancelled) {
+          const data = await response.json();
+          setExams(data.exams || []);
+        }
+      } catch (error) {
+        console.error("Error fetching exams:", error);
       }
-    } catch (error) {
-      console.error("Error fetching exams:", error);
-    }
-  };
+    };
+    fetchExams();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <AppShell
       eyebrow="School Admin Dashboard"
+      allowedRoles={["super_admin", "school_admin"]}
       title="School Command Center"
       description="Track collections, admissions movement, complaints, and operational momentum for the current term."
     >

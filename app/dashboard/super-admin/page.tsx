@@ -14,6 +14,7 @@ export default function SuperAdminDashboardPage() {
       eyebrow="Super Admin Dashboard"
       title="Multi-School Overview"
       description="Manage all schools, system-wide operations, and platform administration."
+      allowedRoles={["super_admin"]}
     >
       {isLoading || !data ? (
         <LoadingPanel />

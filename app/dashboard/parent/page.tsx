@@ -10,6 +10,7 @@ import {
   Users, CreditCard, FileText, MessageSquare, Ticket, Bus, BookOpen,
   CalendarDays, ChevronRight, Mail, AlertTriangle
 } from "lucide-react";
+import { getAccessToken, getUser } from "@/services/auth-storage";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -60,7 +61,7 @@ export default function ParentDashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
+    const token = getAccessToken();
     const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
     Promise.allSettled([
       fetch(`${API_URL}/parent/children`, { headers }).then(r => r.ok ? r.json() : null),
@@ -87,6 +88,7 @@ export default function ParentDashboardPage() {
       eyebrow="Parent Portal"
       title="Family Dashboard"
       description="View your children's academic records, make fee payments, access support, and track transportation."
+      allowedRoles={["parent"]}
     >
       {loading ? (
         <LoadingPanel />

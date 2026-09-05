@@ -1,20 +1,35 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { saveAuthTokens, saveUser, getAccessToken } from "@/services/auth-storage";
+import { getHomeRouteForRole } from "@/app/login/page";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
-export default function ParentLoginPage() {
+const SAFE_REDIRECT_RE = /^\/[a-zA-Z0-9\-_/%?=&.]*$/;
+function safeRedirect(raw: string | null, fallback: string): string {
+  if (!raw) return fallback;
+  return SAFE_REDIRECT_RE.test(raw) ? raw : fallback;
+}
+
+function ParentLoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (getAccessToken()) {
+      router.replace("/dashboard/parent");
+    }
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,13 +49,13 @@ export default function ParentLoginPage() {
         throw new Error(data.detail || "Parent login failed");
       }
 
-      // Store tokens
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      saveAuthTokens(data.access_token, data.refresh_token || "");
+      saveUser(data.user);
 
-      // Redirect to parent portal
-      router.push("/dashboard/parent");
+      const fallback = getHomeRouteForRole(data.user.role || "parent");
+      const requested = searchParams?.get("redirect") || null;
+      const redirectPath = safeRedirect(requested, fallback);
+      router.replace(redirectPath);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Parent login failed");
     } finally {
@@ -109,5 +124,20 @@ export default function ParentLoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function ParentLoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-900 dark:to-gray-800 p-4">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-green-500/30 border-t-green-500" />
+          <p className="text-sm text-gray-500">Loading login…</p>
+        </div>
+      </div>
+    }>
+      <ParentLoginPageInner />
+    </Suspense>
   );
 }

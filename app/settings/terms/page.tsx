@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingPanel } from "@/components/dashboard/ops-primitives";
 import { Calendar, CheckCircle } from "lucide-react";
+import { getAccessToken } from "@/services/auth-storage";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -29,7 +30,7 @@ export default function TermsPage() {
     try {
       const response = await fetch(`${API_URL}/settings/terms`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       });
 
@@ -55,7 +56,7 @@ export default function TermsPage() {
       const response = await fetch(`${API_URL}/terms/terms/${termId}/set-current`, {
         method: "PATCH",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       });
 

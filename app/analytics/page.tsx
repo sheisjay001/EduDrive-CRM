@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingPanel, SectionTitle, TrendPanel, KpiGrid } from "@/components/dashboard/ops-primitives";
 import { TrendingUp, Users, DollarSign, GraduationCap, AlertCircle } from "lucide-react";
+import { getAccessToken } from "@/services/auth-storage";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -47,7 +48,7 @@ export default function AnalyticsPage() {
 
       const response = await fetch(`${API_URL}${endpoint}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       });
 

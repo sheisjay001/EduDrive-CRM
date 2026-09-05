@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable, LoadingPanel } from "@/components/dashboard/ops-primitives";
 import { useParentsQuery } from "@/hooks/use-crm-query";
 import { Plus, Edit, Trash2, Save, X } from "lucide-react";
-import { getUser } from "@/services/auth-storage";
+import { getUser, getAccessToken } from "@/services/auth-storage";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -40,7 +40,7 @@ export default function ParentsPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify(editFormData),
       });
@@ -69,7 +69,7 @@ export default function ParentsPage() {
       const response = await fetch(`${API_URL}/parents/${parentId}`, {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       });
 
@@ -90,7 +90,7 @@ export default function ParentsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify(addFormData),
       });
