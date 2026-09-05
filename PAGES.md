@@ -59,7 +59,7 @@
 | `/students` | https://edudrive-crm.onrender.com/students | Student management (CRUD, import) |
 | `/families` | https://edudrive-crm.onrender.com/families | Family management |
 | `/families/[familyId]` | https://edudrive-crm.onrender.com/families/{id} | Family details page |
-| `/settings/classes` | https://edudrive-crm.onrender.com/settings/classes | Class structure management |
+| `/settings/classes` | https://edudrive-crm.onrender.com/settings/classes | Class structure management (includes timetable upload) |
 | `/settings/terms` | https://edudrive-crm.onrender.com/settings/terms | Academic term/session setup |
 
 ---
@@ -92,7 +92,7 @@
 
 | Route | URL | Description |
 |-------|-----|-------------|
-| `/messaging` | https://edudrive-crm.onrender.com/messaging | Messaging center overview |
+| `/messaging` | https://edudrive-crm.onrender.com/messaging | Messaging center overview (includes school notifications) |
 | `/messaging/templates` | https://edudrive-crm.onrender.com/messaging/templates | Message templates management |
 | `/messaging/broadcasts` | https://edudrive-crm.onrender.com/messaging/broadcasts | Broadcast messaging |
 | `/reminders` | https://edudrive-crm.onrender.com/reminders | Reminder queue management |
@@ -148,7 +148,7 @@
 
 | Route | URL | Description |
 |-------|-----|-------------|
-| `/settings` | https://edudrive-crm.onrender.com/settings | System settings overview |
+| `/settings` | https://edudrive-crm.onrender.com/settings | System settings overview (includes PIN management) |
 
 ---
 
@@ -224,7 +224,7 @@
 - `/frontdesk`
 
 ### **Teacher**
-- `/dashboard/teacher`
+- `/dashboard/teacher` (includes My Students, Attendance, CSV Results Upload)
 - `/students`
 - `/staff/workload`
 
@@ -235,7 +235,7 @@
 - `/helpdesk`
 
 ### **Student**
-- `/dashboard/student`
+- `/dashboard/student` (includes CBT Exams, Results Check with PIN)
 - `/students/[studentId]`
 - `/helpdesk`
 
