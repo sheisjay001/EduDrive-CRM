@@ -136,15 +136,15 @@ export default function ClassesPage() {
         <>
           <div className="mb-6 flex items-center justify-between gap-4">
             <div className="flex gap-2">
-              <Button variant="secondary">
+              <Button variant="secondary" onClick={() => confirm("Filter by classes coming soon")}>
                 <GraduationCap className="mr-2 h-4 w-4" />
                 Classes ({classes.length})
               </Button>
-              <Button variant="secondary">
+              <Button variant="secondary" onClick={() => confirm("Filter by subjects coming soon")}>
                 <BookOpen className="mr-2 h-4 w-4" />
                 Subjects ({classes.reduce((acc, classItem) => acc + (classItem.subjects?.length || 0), 0)})
               </Button>
-              <Button variant="secondary">
+              <Button variant="secondary" onClick={() => confirm("Timetables feature coming soon")}>
                 <Calendar className="mr-2 h-4 w-4" />
                 Timetables
               </Button>
@@ -168,11 +168,11 @@ export default function ClassesPage() {
                   <h3 className="text-lg font-semibold text-white">Timetable Management</h3>
                   <p className="mt-2 text-sm text-[#9eb1cf]">Upload and manage class, exam, and general timetables</p>
                   <div className="mt-4 flex gap-2">
-                    <Button variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10">
+                    <Button variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10" onClick={() => confirm("Upload timetable feature coming soon")}>
                       <Upload className="mr-2 h-4 w-4" />
                       Upload Timetable
                     </Button>
-                    <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
+                    <Button variant="outline" className="border-white/20 text-white hover:bg-white/10" onClick={() => confirm("View timetables feature coming soon")}>
                       View All Timetables
                     </Button>
                   </div>
@@ -231,10 +231,10 @@ export default function ClassesPage() {
                       >
                         Promote
                       </Button>
-                      <Button size="sm" variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10">
+                      <Button size="sm" variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10" onClick={() => confirm("Edit class feature coming soon")}>
                         Edit
                       </Button>
-                      <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10">
+                      <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => confirm("Delete class feature coming soon")}>
                         Delete
                       </Button>
                     </div>

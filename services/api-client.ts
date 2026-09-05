@@ -3,6 +3,10 @@ import type {
   AdmissionsResponse,
   AuthPayload,
   AuthResponse,
+  CBTExamCreateRequest,
+  CBTExamUpdateRequest,
+  CBTExamItem,
+  CBTExamsResponse,
   ConvertLeadPayload,
   ConvertLeadResponse,
   DashboardResponse,
@@ -16,13 +20,20 @@ import type {
   LeadDetail,
   MessageTemplatesResponse,
   MessagingResponse,
+  NotificationCreateRequest,
+  NotificationItem,
+  NotificationsResponse,
   ParentDetail,
   ParentsResponse,
   PasswordResetResponse,
+  PINGenerateRequest,
+  PINItem,
+  PINsResponse,
   ReportsResponse,
   ResetPasswordPayload,
   SettingsResponse,
   StaffResponse,
+  StudentCreateRequest,
   StudentDetail,
   StudentsResponse,
   TicketDetailResponse,
@@ -361,5 +372,119 @@ export const apiClient = {
       }
       return await response.json();
     });
+  },
+  createStudent(payload: StudentCreateRequest) {
+    return request<{ id: string }>(
+      "/students",
+      {} as { id: string },
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  getCbtExams() {
+    return request<CBTExamsResponse>(
+      "/cbt/exams",
+      {} as CBTExamsResponse,
+    );
+  },
+  createCbtExam(payload: CBTExamCreateRequest) {
+    return request<CBTExamItem>(
+      "/cbt/exams",
+      {} as CBTExamItem,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  updateCbtExam(examId: number, payload: CBTExamUpdateRequest) {
+    return request<CBTExamItem>(
+      `/cbt/exams/${examId}`,
+      {} as CBTExamItem,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  deleteCbtExam(examId: number) {
+    return request<{ success: boolean }>(
+      `/cbt/exams/${examId}`,
+      {} as { success: boolean },
+      {
+        method: "DELETE",
+      },
+    );
+  },
+  getNotifications() {
+    return request<NotificationsResponse>(
+      "/notifications",
+      {} as NotificationsResponse,
+    );
+  },
+  createNotification(payload: NotificationCreateRequest) {
+    return request<NotificationItem>(
+      "/notifications",
+      {} as NotificationItem,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  deleteNotification(notificationId: number) {
+    return request<{ success: boolean }>(
+      `/notifications/${notificationId}`,
+      {} as { success: boolean },
+      {
+        method: "DELETE",
+      },
+    );
+  },
+  getPins() {
+    return request<PINsResponse>(
+      "/pins",
+      {} as PINsResponse,
+    );
+  },
+  generatePins(payload: PINGenerateRequest) {
+    return request<PINsResponse>(
+      "/pins/generate",
+      {} as PINsResponse,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  blockPin(pinId: number) {
+    return request<{ success: boolean }>(
+      `/pins/${pinId}/block`,
+      {} as { success: boolean },
+      {
+        method: "POST",
+      },
+    );
+  },
+  deletePin(pinId: number) {
+    return request<{ success: boolean }>(
+      `/pins/${pinId}`,
+      {} as { success: boolean },
+      {
+        method: "DELETE",
+      },
+    );
+  },
+  updateSettings(payload: Record<string, unknown>) {
+    return request<{ success: boolean }>(
+      "/settings",
+      {} as { success: boolean },
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      },
+    );
   },
 };

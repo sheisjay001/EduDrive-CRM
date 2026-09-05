@@ -293,7 +293,11 @@ export default function Home() {
                   ))}
                 </ul>
                 <Button
-                  onClick={() => router.push("/signup")}
+                  onClick={() =>
+                    tier.name === "Enterprise"
+                      ? confirm("Coming soon — our sales team will reach out to you.")
+                      : router.push("/signup")
+                  }
                   className={`mt-8 w-full ${
                     tier.popular
                       ? "bg-[#d9a441] text-white hover:bg-[#d9a441]/90"

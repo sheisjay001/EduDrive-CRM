@@ -125,9 +125,9 @@ export default function MessageTemplatesPage() {
               </div>
               <p className="text-sm leading-7 text-[#d6dfef]">Last edited {template.lastEdited}.</p>
               <div className="text-sm text-[#9eb1cf]">
-                <Link href="#" className="text-[#d9a441] underline">
+                <button onClick={() => confirm("Template preview feature coming soon")} className="text-[#d9a441] underline">
                   Preview template
-                </Link>
+                </button>
               </div>
             </Card>
           ))}

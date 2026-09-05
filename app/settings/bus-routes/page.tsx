@@ -178,10 +178,10 @@ export default function BusRoutesPage() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10">
+                      <Button size="sm" variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10" onClick={() => confirm("Edit route feature coming soon")}>
                         Edit
                       </Button>
-                      <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10">
+                      <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => confirm("Delete route feature coming soon")}>
                         Delete
                       </Button>
                     </div>

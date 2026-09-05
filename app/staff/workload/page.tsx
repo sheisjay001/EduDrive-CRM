@@ -161,7 +161,7 @@ export default function WorkloadPage() {
                 Trends
               </Button>
             </div>
-            <Button variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10">
+            <Button variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10" onClick={() => confirm("Update workload feature coming soon")}>
               Update Workload
             </Button>
           </div>

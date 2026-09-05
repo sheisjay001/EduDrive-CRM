@@ -134,10 +134,10 @@ export default function TermsPage() {
                           Set Active
                         </Button>
                       )}
-                      <Button size="sm" variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10">
+                      <Button size="sm" variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10" onClick={() => confirm("Edit term feature coming soon")}>
                         Edit
                       </Button>
-                      <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10">
+                      <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => confirm("Delete term feature coming soon")}>
                         Delete
                       </Button>
                     </div>

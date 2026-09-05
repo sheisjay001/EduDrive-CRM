@@ -135,7 +135,7 @@ export default function FrontDeskPage() {
                 Staff Performance
               </Button>
             </div>
-            <Button onClick={() => setShowCreateLogDialog(true)}>
+            <Button onClick={() => confirm("Create Daily Log feature coming soon")}>
               <Plus className="mr-2 h-4 w-4" />
               Create Daily Log
             </Button>

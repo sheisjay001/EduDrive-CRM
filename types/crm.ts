@@ -400,3 +400,77 @@ export type ReportsResponse = {
 export type SettingsResponse = {
   groups: SettingGroup[];
 };
+
+export type CBTExamItem = {
+  id: number;
+  title: string;
+  student_class: string;
+  duration_minutes: number;
+  status: string;
+  created_at: string;
+};
+
+export type CBTExamsResponse = {
+  exams: CBTExamItem[];
+};
+
+export type NotificationItem = {
+  id: number;
+  title: string;
+  message: string;
+  target_audience: string;
+  created_at: string;
+};
+
+export type NotificationsResponse = {
+  notifications: NotificationItem[];
+};
+
+export type PINItem = {
+  id: number;
+  pin_code: string;
+  serial_number: string;
+  status: string;
+  student_id?: number | null;
+  usage_count: number;
+  max_usage: number;
+  created_at: string;
+};
+
+export type PINsResponse = {
+  pins: PINItem[];
+};
+
+export type StudentCreateRequest = {
+  first_name: string;
+  last_name: string;
+  gender?: string;
+  date_of_birth?: string;
+  class_id?: string;
+  family_id?: string;
+};
+
+export type CBTExamCreateRequest = {
+  title: string;
+  student_class: string;
+  duration_minutes?: number;
+  status?: string;
+};
+
+export type CBTExamUpdateRequest = {
+  title?: string;
+  student_class?: string;
+  class?: string;
+  duration_minutes?: number;
+  status?: string;
+};
+
+export type NotificationCreateRequest = {
+  title: string;
+  message: string;
+  target_audience?: string;
+};
+
+export type PINGenerateRequest = {
+  quantity: number;
+};

@@ -228,10 +228,10 @@ export default function UserAdministrationPage() {
                           {user.status}
                         </Badge>
                         <div className="flex gap-2">
-                          <Button size="sm" variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10">
+                          <Button size="sm" variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10" onClick={() => confirm("Edit user feature coming soon")}>
                             Edit
                           </Button>
-                          <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10">
+                          <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => confirm("Delete user feature coming soon")}>
                             Delete
                           </Button>
                         </div>
@@ -333,7 +333,7 @@ export default function UserAdministrationPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <Button size="sm" variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10">
+                          <Button size="sm" variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10" onClick={() => confirm("Edit role permissions feature coming soon")}>
                             Edit
                           </Button>
                         </td>

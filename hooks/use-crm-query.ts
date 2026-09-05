@@ -141,3 +141,24 @@ export function useSettingsQuery() {
     queryFn: () => apiClient.getSettings(),
   });
 }
+
+export function useCbtExamsQuery() {
+  return useQuery({
+    queryKey: ["cbtExams"],
+    queryFn: () => apiClient.getCbtExams(),
+  });
+}
+
+export function useNotificationsQuery() {
+  return useQuery({
+    queryKey: ["notifications"],
+    queryFn: () => apiClient.getNotifications(),
+  });
+}
+
+export function usePinsQuery() {
+  return useQuery({
+    queryKey: ["pins"],
+    queryFn: () => apiClient.getPins(),
+  });
+}

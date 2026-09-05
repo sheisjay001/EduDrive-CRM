@@ -9,19 +9,38 @@ import { DataTable, LoadingPanel } from "@/components/dashboard/ops-primitives";
 import { Upload, Plus, Edit, Trash2, Save, X } from "lucide-react";
 import { getUser } from "@/services/auth-storage";
 import { apiClient } from "@/services/api-client";
+import { useStudentsQuery } from "@/hooks/use-crm-query";
+import type { StudentItem } from "@/types/crm";
 
 export default function StudentsPage() {
+  const { data, isLoading, refetch } = useStudentsQuery();
   const [isImporting, setIsImporting] = useState(false);
   const [editingStudent, setEditingStudent] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Record<string, unknown>>({});
   const [showAddForm, setShowAddForm] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [students, setStudents] = useState<Record<string, unknown>[]>([]);
+  const [addFormData, setAddFormData] = useState<Record<string, string>>({
+    first_name: "",
+    last_name: "",
+    gender: "",
+    date_of_birth: "",
+    class_id: "",
+    family_id: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const user = getUser();
   const userRole = (user as { role?: string })?.role || "school_admin";
-  const canEdit = ["school_admin", "admission_officer", "teacher"].includes(userRole);
+  const canEdit = ["school_admin", "admissions_officer", "teacher"].includes(userRole);
   const canDelete = userRole === "school_admin";
+
+  const studentRows: Array<StudentItem & { first_name: string; last_name: string; class_id?: string; family_id?: string }> =
+    data?.students?.map((s) => ({
+      ...s,
+      first_name: s.fullName?.split(" ")[0] ?? "",
+      last_name: s.fullName?.split(" ").slice(1).join(" ") ?? "",
+      class_id: s.className,
+      family_id: s.guardian,
+    })) ?? [];
 
   const handleCSVImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -31,8 +50,8 @@ export default function StudentsPage() {
 
     try {
       const result = await apiClient.importStudentsCSV(file);
-      alert(`Successfully imported ${result.students_created} students`);
-      // Refresh students list
+      alert(`Successfully imported ${(result as { students_created?: number }).students_created ?? 0} students`);
+      await refetch();
     } catch (error) {
       console.error('Error importing students:', error);
       alert('Error importing students');
@@ -58,8 +77,9 @@ export default function StudentsPage() {
     try {
       await apiClient.updateStudent(studentId, editFormData);
       setEditingStudent(null);
+      setEditFormData({});
       alert('Student updated successfully');
-      // Refresh students list
+      await refetch();
     } catch (error) {
       alert('Error updating student');
     }
@@ -76,10 +96,55 @@ export default function StudentsPage() {
     try {
       await apiClient.deleteStudent(studentId);
       alert('Student deleted successfully');
-      // Refresh students list
+      await refetch();
     } catch (error) {
       alert('Error deleting student');
     }
+  };
+
+  const handleAddStudent = async () => {
+    if (!addFormData.first_name || !addFormData.last_name) {
+      alert('First name and last name are required');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await apiClient.createStudent({
+        first_name: addFormData.first_name,
+        last_name: addFormData.last_name,
+        gender: addFormData.gender || undefined,
+        date_of_birth: addFormData.date_of_birth || undefined,
+        class_id: addFormData.class_id || undefined,
+        family_id: addFormData.family_id || undefined,
+      });
+      alert('Student created successfully');
+      setShowAddForm(false);
+      setAddFormData({
+        first_name: "",
+        last_name: "",
+        gender: "",
+        date_of_birth: "",
+        class_id: "",
+        family_id: "",
+      });
+      await refetch();
+    } catch (error) {
+      alert('Error creating student');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelAdd = () => {
+    setShowAddForm(false);
+    setAddFormData({
+      first_name: "",
+      last_name: "",
+      gender: "",
+      date_of_birth: "",
+      class_id: "",
+      family_id: "",
+    });
   };
 
   return (
@@ -88,7 +153,7 @@ export default function StudentsPage() {
       title="Student history, health, and performance"
       description="Bring attendance, behaviour, classroom placement, and medical context together so teachers and school operations always work from the same source of truth."
     >
-      <div className="mb-6 flex gap-4">
+      <div className="mb-6 flex flex-wrap gap-4">
         <Button
           onClick={() => setShowAddForm(true)}
           className="bg-[#d9a441] text-white hover:bg-[#d9a441]/90"
@@ -115,6 +180,94 @@ export default function StudentsPage() {
         </div>
       </div>
 
+      {showAddForm && (
+        <div className="mb-6 rounded-[24px] border border-white/10 bg-white/5 p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-lg font-semibold text-white">Add New Student</p>
+            <Button size="sm" variant="outline" onClick={handleCancelAdd} className="border-white/20 text-[#9eb1cf]">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <label className="text-xs uppercase tracking-[0.25em] text-[#8ea4c8]">First Name *</label>
+              <input
+                type="text"
+                value={addFormData.first_name}
+                onChange={(e) => setAddFormData({ ...addFormData, first_name: e.target.value })}
+                className="mt-2 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white focus:border-[#d9a441] focus:outline-none"
+                placeholder="John"
+              />
+            </div>
+            <div>
+              <label className="text-xs uppercase tracking-[0.25em] text-[#8ea4c8]">Last Name *</label>
+              <input
+                type="text"
+                value={addFormData.last_name}
+                onChange={(e) => setAddFormData({ ...addFormData, last_name: e.target.value })}
+                className="mt-2 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white focus:border-[#d9a441] focus:outline-none"
+                placeholder="Doe"
+              />
+            </div>
+            <div>
+              <label className="text-xs uppercase tracking-[0.25em] text-[#8ea4c8]">Gender</label>
+              <input
+                type="text"
+                value={addFormData.gender}
+                onChange={(e) => setAddFormData({ ...addFormData, gender: e.target.value })}
+                className="mt-2 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white focus:border-[#d9a441] focus:outline-none"
+                placeholder="Male / Female"
+              />
+            </div>
+            <div>
+              <label className="text-xs uppercase tracking-[0.25em] text-[#8ea4c8]">Date of Birth</label>
+              <input
+                type="date"
+                value={addFormData.date_of_birth}
+                onChange={(e) => setAddFormData({ ...addFormData, date_of_birth: e.target.value })}
+                className="mt-2 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white focus:border-[#d9a441] focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs uppercase tracking-[0.25em] text-[#8ea4c8]">Class</label>
+              <input
+                type="text"
+                value={addFormData.class_id}
+                onChange={(e) => setAddFormData({ ...addFormData, class_id: e.target.value })}
+                className="mt-2 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white focus:border-[#d9a441] focus:outline-none"
+                placeholder="SS1"
+              />
+            </div>
+            <div>
+              <label className="text-xs uppercase tracking-[0.25em] text-[#8ea4c8]">Family ID</label>
+              <input
+                type="text"
+                value={addFormData.family_id}
+                onChange={(e) => setAddFormData({ ...addFormData, family_id: e.target.value })}
+                className="mt-2 w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white focus:border-[#d9a441] focus:outline-none"
+                placeholder="fam_xxx"
+              />
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={handleCancelAdd}
+              className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddStudent}
+              disabled={isSubmitting}
+              className="bg-[#d9a441] text-white hover:bg-[#d9a441]/90"
+            >
+              {isSubmitting ? 'Creating...' : 'Save Student'}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <LoadingPanel />
       ) : (
@@ -122,7 +275,7 @@ export default function StudentsPage() {
           title="Student directory"
           description="An operations-ready directory for administration, finance, and classroom support."
           columns={["Student", "Class", "Guardian", "Attendance", "Behaviour", "Medical", "Actions"]}
-          rows={students.map((student: any) => [ // eslint-disable-line @typescript-eslint/no-explicit-any
+          rows={studentRows.map((student) => [
             editingStudent === student.id ? (
               <input
                 key="first_name"
@@ -145,14 +298,14 @@ export default function StudentsPage() {
                 className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white"
               />
             ) : (
-              student.class_id || 'N/A'
+              student.class_id || student.className || 'N/A'
             ),
-            student.family_id || 'N/A',
-            'N/A',
+            student.family_id || student.guardian || 'N/A',
+            student.attendance || 'N/A',
             <Badge key={`${student.id}-behaviour`} tone="neutral">
-              Active
+              {student.behaviour || 'Active'}
             </Badge>,
-            'N/A',
+            student.medicalFlag || 'N/A',
             <div key={`${student.id}-actions`} className="flex gap-2">
               {editingStudent === student.id ? (
                 <>

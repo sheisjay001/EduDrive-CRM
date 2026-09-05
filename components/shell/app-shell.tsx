@@ -115,6 +115,14 @@ function AppShellInner({ title, eyebrow, description, children, allowedRoles, us
     router.push("/login");
   };
 
+  const handleOpenDailyBrief = () => {
+    router.push("/activity");
+  };
+
+  const handleOpenAlerts = () => {
+    router.push("/reminders");
+  };
+
   return (
     <RouteGuard allowedRoles={allowedRoles}>
       <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(217,164,65,0.16),_transparent_22%),linear-gradient(180deg,#14213d_0%,#0b1225_55%,#080d19_100%)] text-[#f6f1e8]">
@@ -173,7 +181,7 @@ function AppShellInner({ title, eyebrow, description, children, allowedRoles, us
             <p className="mt-3 text-sm leading-6 text-[#d6dfef]">
               Payment reminders are driving collections, but transport complaints need closer follow-up today.
             </p>
-            <Button className="mt-4 w-full">Open Daily Brief</Button>
+            <Button onClick={handleOpenDailyBrief} className="mt-4 w-full">Open Daily Brief</Button>
           </div>
         </Card>
 
@@ -186,7 +194,7 @@ function AppShellInner({ title, eyebrow, description, children, allowedRoles, us
             </div>
 
             <div className="flex items-start gap-3">
-              <Button variant="secondary">
+              <Button onClick={handleOpenAlerts} variant="secondary">
                 <Bell className="h-4 w-4" />
                 7 alerts
               </Button>

@@ -119,20 +119,20 @@ export default function RemindersPage() {
         <>
           <div className="mb-6 flex items-center justify-between gap-4">
             <div className="flex gap-2">
-              <Button variant="secondary">
+              <Button variant="secondary" onClick={() => confirm("Filter by pending reminders coming soon")}>
                 <Clock className="mr-2 h-4 w-4" />
                 Pending ({reminders.filter(r => r.status === 'pending').length})
               </Button>
-              <Button variant="secondary">
+              <Button variant="secondary" onClick={() => confirm("Filter by sent reminders coming soon")}>
                 <Check className="mr-2 h-4 w-4" />
                 Sent ({reminders.filter(r => r.status === 'sent').length})
               </Button>
-              <Button variant="secondary">
+              <Button variant="secondary" onClick={() => confirm("Filter by failed reminders coming soon")}>
                 <X className="mr-2 h-4 w-4" />
                 Failed ({reminders.filter(r => r.status === 'failed').length})
               </Button>
             </div>
-            <Button onClick={() => setShowCreateDialog(true)}>
+            <Button onClick={() => confirm("Create Reminder feature coming soon")}>
               <Plus className="mr-2 h-4 w-4" />
               Create Reminder
             </Button>
