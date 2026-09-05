@@ -3,8 +3,10 @@
 import { AppShell } from "@/components/shell/app-shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { KpiGrid, LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
 import { useDashboardQuery } from "@/hooks/use-crm-query";
+import { Upload, Users, CheckCircle, XCircle } from "lucide-react";
 
 export default function TeacherDashboardPage() {
   const { data, isLoading } = useDashboardQuery();
@@ -124,6 +126,67 @@ export default function TeacherDashboardPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </Card>
+          </div>
+
+          <div className="grid gap-6 mt-6 xl:grid-cols-2">
+            <Card className="p-6">
+              <SectionTitle
+                title="My Students"
+                description="Students assigned to your classes"
+              />
+              <div className="mt-4 space-y-3">
+                {[
+                  { name: "Chinedu Okafor", class: "JSS 2A", admission: "ADM-001" },
+                  { name: "Ngozi Eze", class: "JSS 2A", admission: "ADM-002" },
+                  { name: "Emeka Johnson", class: "SS 1B", admission: "ADM-003" },
+                  { name: "Fatima Ahmed", class: "SS 1B", admission: "ADM-004" },
+                ].map((student, idx) => (
+                  <div key={idx} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/15 text-blue-400">
+                        <Users className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">{student.name}</p>
+                        <p className="text-xs text-[#9eb1cf]">{student.class} • {student.admission}</p>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10">
+                      View
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <SectionTitle
+                title="Attendance & Results Management"
+                description="Mark attendance and upload student results"
+              />
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <CheckCircle className="h-5 w-5 text-green-400" />
+                    <p className="font-medium text-white">Mark Attendance</p>
+                  </div>
+                  <p className="text-sm text-[#9eb1cf] mb-3">Record daily attendance for your classes</p>
+                  <Button variant="outline" className="w-full border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10">
+                    Open Attendance
+                  </Button>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <Upload className="h-5 w-5 text-[#d9a441]" />
+                    <p className="font-medium text-white">Upload Results</p>
+                  </div>
+                  <p className="text-sm text-[#9eb1cf] mb-3">Upload student results via CSV file</p>
+                  <Button variant="outline" className="w-full border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10">
+                    Upload CSV
+                  </Button>
+                </div>
               </div>
             </Card>
           </div>

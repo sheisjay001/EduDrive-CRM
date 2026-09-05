@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingPanel } from "@/components/dashboard/ops-primitives";
-import { Users, BookOpen, GraduationCap, Plus } from "lucide-react";
+import { Users, BookOpen, GraduationCap, Plus, Calendar, Upload } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -143,6 +143,10 @@ export default function ClassesPage() {
                 <BookOpen className="mr-2 h-4 w-4" />
                 Subjects ({classes.reduce((acc, classItem) => acc + (classItem.subjects?.length || 0), 0)})
               </Button>
+              <Button variant="secondary">
+                <Calendar className="mr-2 h-4 w-4" />
+                Timetables
+              </Button>
             </div>
             <div className="flex gap-2">
               <Button onClick={() => setShowCreateSubjectDialog(true)}>
@@ -157,6 +161,24 @@ export default function ClassesPage() {
           </div>
 
           <div className="space-y-6">
+            <Card className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white">Timetable Management</h3>
+                  <p className="mt-2 text-sm text-[#9eb1cf]">Upload and manage class, exam, and general timetables</p>
+                  <div className="mt-4 flex gap-2">
+                    <Button variant="outline" className="border-[#d9a441]/30 text-[#d9a441] hover:bg-[#d9a441]/10">
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload Timetable
+                    </Button>
+                    <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
+                      View All Timetables
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
             {classes.length === 0 ? (
               <Card className="p-6">
                 <p className="text-center text-[#9eb1cf]">No classes configured</p>

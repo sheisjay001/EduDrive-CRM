@@ -218,6 +218,58 @@ export default function StudentDashboardPage() {
             </Card>
           </div>
 
+          <div className="grid gap-6 mt-6 lg:grid-cols-2">
+            <Card className="p-6">
+              <SectionTitle title="Online Exams (CBT)" description="Computer-based tests available" />
+              <div className="mt-4 space-y-3">
+                {[
+                  { title: "Mathematics Mid-term", subject: "Mathematics", duration: "30 min", status: "available" },
+                  { title: "English Language Quiz", subject: "English", duration: "20 min", status: "completed" },
+                  { title: "Basic Science Assessment", subject: "Basic Science", duration: "25 min", status: "locked" },
+                ].map((exam, idx) => (
+                  <div key={idx} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-500/15 text-purple-400">
+                        <BookOpen className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-white">{exam.title}</p>
+                        <p className="text-xs text-[#9eb1cf]">{exam.subject} • {exam.duration}</p>
+                      </div>
+                    </div>
+                    <Badge tone={exam.status === "available" ? "good" : exam.status === "completed" ? "neutral" : "warn"}>
+                      {exam.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <SectionTitle title="Check Results" description="View your academic performance" />
+              <div className="mt-4 space-y-4">
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-sm text-[#9eb1cf]">Enter your scratch card PIN to view results</p>
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="PIN Code"
+                      className="flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white focus:border-[#d9a441] focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Serial Number"
+                      className="flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white focus:border-[#d9a441] focus:outline-none"
+                    />
+                  </div>
+                  <Button className="mt-3 w-full bg-[#d9a441] text-white hover:bg-[#d9a441]/90">
+                    View Results
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+
           <div className="mt-6">
             <Card className="p-6">
               <SectionTitle title="Academic Summary" description="Subject performance snapshot" />

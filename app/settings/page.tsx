@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingPanel } from "@/components/dashboard/ops-primitives";
 import { useSettingsQuery } from "@/hooks/use-crm-query";
 import { getUser } from "@/services/auth-storage";
+import { CreditCard, Plus, Trash2, Lock } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -148,6 +149,45 @@ export default function SettingsPage() {
                 </div>
               </Card>
             ))}
+
+            <Card className="p-6">
+              <p className="text-xs uppercase tracking-[0.35em] text-[#d9a441]">Scratch Card PINs</p>
+              <p className="mt-3 text-sm leading-7 text-[#9eb1cf]">Generate and manage PINs for result verification</p>
+              <div className="mt-6 space-y-4">
+                <Button className="w-full bg-[#d9a441] text-white hover:bg-[#d9a441]/90">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Generate PINs
+                </Button>
+                <div className="space-y-2">
+                  {[
+                    { code: "1234-5678-90", serial: "SN-001", status: "unused" },
+                    { code: "2345-6789-01", serial: "SN-002", status: "used" },
+                    { code: "3456-7890-12", serial: "SN-003", status: "blocked" },
+                  ].map((pin, idx) => (
+                    <div key={idx} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3">
+                      <div>
+                        <p className="text-sm font-medium text-white">{pin.code}</p>
+                        <p className="text-xs text-[#9eb1cf]">{pin.serial}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs ${
+                          pin.status === "unused" ? "text-green-400" :
+                          pin.status === "used" ? "text-yellow-400" : "text-red-400"
+                        }`}>{pin.status}</span>
+                        {pin.status === "unused" && (
+                          <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10">
+                            <Lock className="h-3 w-3" />
+                          </Button>
+                        )}
+                        <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10">
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
           </div>
         </>
       )}
