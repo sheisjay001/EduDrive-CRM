@@ -154,7 +154,7 @@ async def get_all_cbt_exams(
 async def delete_cbt_exam(
     exam_id: int,
     current_user = Depends(require_role(["admin", "super_admin", "school_admin"]))
-):
+:
     supabase = get_supabase_client()
     
     try:
@@ -162,6 +162,51 @@ async def delete_cbt_exam(
         return {"message": "Exam deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete exam: {str(e)}")
+
+
+# Admin: Update CBT Exam
+@router.patch("/cbt/exams/{exam_id}")
+async def update_cbt_exam(
+    exam_id: int,
+    payload: dict,
+    current_user = Depends(require_role(["admin", "super_admin", "school_admin"]))
+:
+    supabase = get_supabase_client()
+    
+    try:
+        update_data: dict = {}
+        if payload.get("title") is not None:
+            update_data["title"] = payload["title"]
+        if payload.get("class") is not None:
+            update_data["class"] = payload["class"]
+        elif payload.get("student_class") is not None:
+            update_data["class"] = payload["student_class"]
+        if payload.get("duration_minutes") is not None:
+            update_data["duration_minutes"] = payload["duration_minutes"]
+        if payload.get("status") is not None:
+            update_data["status"] = payload["status"]
+        
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No fields provided for update")
+        
+        result = supabase.table("cbt_exams").update(update_data).eq("id", exam_id).execute()
+        
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Exam not found")
+        
+        updated = result.data[0]
+        return CBTExamResponse(
+            id=updated["id"],
+            title=updated["title"],
+            student_class=updated["class"],
+            duration_minutes=updated["duration_minutes"],
+            status=updated["status"],
+            created_at=updated["created_at"]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update exam: {str(e)}")
 
 
 # Student: Get Active Exams for Class
