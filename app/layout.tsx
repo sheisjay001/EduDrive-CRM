@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Manrope } from "next/font/google";
+import { Cormorant_Garamond, Poppins } from "next/font/google";
 import { AppProviders } from "@/components/shell/app-providers";
 import "./globals.css";
 
@@ -10,10 +10,10 @@ const display = Cormorant_Garamond({
   display: "swap",
 });
 
-const body = Manrope({
+const body = Poppins({
   variable: "--font-body",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700"],
   display: "swap",
 });
 
