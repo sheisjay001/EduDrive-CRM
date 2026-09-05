@@ -123,12 +123,14 @@ export default function Home() {
 
   function getDashboardPath(role: string): string {
     const rolePaths: Record<string, string> = {
-      super_admin: "/dashboard",
-      school_admin: "/dashboard",
-      admissions_officer: "/dashboard",
-      bursar: "/dashboard",
-      teacher: "/dashboard",
-      helpdesk_officer: "/dashboard",
+      super_admin: "/dashboard/super-admin",
+      school_admin: "/dashboard/school-admin",
+      admissions_officer: "/dashboard/admissions",
+      bursar: "/dashboard/bursar",
+      teacher: "/dashboard/teacher",
+      helpdesk_officer: "/dashboard/helpdesk",
+      student: "/dashboard/student",
+      parent: "/dashboard/parent",
     };
     return rolePaths[role] || "/dashboard";
   }
