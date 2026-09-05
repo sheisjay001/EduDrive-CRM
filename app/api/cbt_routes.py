@@ -154,7 +154,7 @@ async def get_all_cbt_exams(
 async def delete_cbt_exam(
     exam_id: int,
     current_user = Depends(require_role(["admin", "super_admin", "school_admin"]))
-:
+):
     supabase = get_supabase_client()
     
     try:
