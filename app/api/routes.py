@@ -70,6 +70,12 @@ from app.api.term_routes import router as term_router
 from app.api.user_admin_routes import router as user_admin_router
 from app.api.workload_routes import router as workload_router
 from app.api.transport_routes import router as transport_router, compat_router as transport_compat_router
+from app.api.cbt_routes import router as cbt_router
+from app.api.pin_routes import router as pin_router
+from app.api.timetable_routes import router as timetable_router
+from app.api.enhanced_results_routes import router as enhanced_results_router
+from app.api.teacher_routes import router as teacher_router
+from app.api.notifications_routes import router as notifications_router
 
 router = APIRouter()
 router.include_router(activity_router)
@@ -92,6 +98,12 @@ router.include_router(user_admin_router)
 router.include_router(workload_router)
 router.include_router(transport_router)
 router.include_router(transport_compat_router)
+router.include_router(cbt_router)
+router.include_router(pin_router)
+router.include_router(timetable_router)
+router.include_router(enhanced_results_router)
+router.include_router(teacher_router)
+router.include_router(notifications_router)
 
 
 @router.post("/auth/login", response_model=AuthResponse)
