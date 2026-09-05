@@ -169,8 +169,7 @@ async def delete_cbt_exam(
 async def update_cbt_exam(
     exam_id: int,
     payload: dict,
-    current_user = Depends(require_role(["admin", "super_admin", "school_admin"]))
-:
+    current_user = Depends(require_role(["admin", "super_admin", "school_admin"]))):
     supabase = get_supabase_client()
     
     try:
