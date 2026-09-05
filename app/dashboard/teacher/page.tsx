@@ -1,15 +1,29 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/shell/app-shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { KpiGrid, LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
 import { useDashboardQuery } from "@/hooks/use-crm-query";
-import { Upload, Users, CheckCircle, XCircle } from "lucide-react";
+import { Upload, Users, CheckCircle, XCircle, User, BookOpen, Mail, Phone } from "lucide-react";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
 export default function TeacherDashboardPage() {
   const { data, isLoading } = useDashboardQuery();
+  const [user, setUser] = useState<{ fullName?: string; email?: string; id?: string } | null>(null);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const stored = localStorage.getItem("user");
+        if (stored) setUser(JSON.parse(stored));
+      } catch { /* noop */ }
+    };
+    loadUser();
+  }, []);
 
   return (
     <AppShell
@@ -21,6 +35,50 @@ export default function TeacherDashboardPage() {
         <LoadingPanel />
       ) : (
         <>
+          <Card className="p-6 mb-6">
+            <SectionTitle title="My Profile" description="Your teacher information" />
+            <div className="mt-4 flex items-start gap-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#d9a441]/15 text-[#d9a441]">
+                <User className="h-8 w-8" />
+              </div>
+              <div className="flex-1 space-y-1">
+                <p className="text-lg font-semibold text-white">{user?.fullName || "Teacher"}</p>
+                <p className="text-sm text-[#9eb1cf]">{user?.email || "No email on record"}</p>
+                <div className="pt-2 flex flex-wrap gap-2">
+                  <Badge tone="good">Active</Badge>
+                  <Badge tone="neutral">Mathematics & Physics</Badge>
+                </div>
+              </div>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-[#8ea4c8]">
+                  <BookOpen className="h-3 w-3" />
+                  Subject
+                </div>
+                <p className="mt-1 font-medium text-white">Mathematics</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-[#8ea4c8]">
+                  <Mail className="h-3 w-3" />
+                  Email
+                </div>
+                <p className="mt-1 font-medium text-white">{user?.email || "—"}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-[#8ea4c8]">
+                  <Phone className="h-3 w-3" />
+                  Phone
+                </div>
+                <p className="mt-1 font-medium text-white">+234 800 000 0000</p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <p className="text-xs uppercase tracking-wider text-[#8ea4c8]">Classes</p>
+                <p className="mt-1 font-medium text-white">JSS 2A • SS 1B</p>
+              </div>
+            </div>
+          </Card>
+
           <KpiGrid items={[
             { label: "My Students", value: "45", change: "JSS 2A • SS 1B", tone: "neutral" },
             { label: "Attendance Today", value: "94%", change: "2 absent", tone: "good" },

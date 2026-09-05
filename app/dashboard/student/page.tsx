@@ -98,26 +98,34 @@ export default function StudentDashboardPage() {
             <Card className="p-6">
               <SectionTitle title="My Profile" description="Your student information" />
               <div className="mt-4 flex items-start gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#1c64f2]/20 text-[#7fa5ff]">
-                  <User className="h-7 w-7" />
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#d9a441]/15 text-[#d9a441]">
+                  <User className="h-8 w-8" />
                 </div>
                 <div className="flex-1 space-y-1">
                   <p className="text-lg font-semibold text-white">{user?.fullName || "Student"}</p>
                   <p className="text-sm text-[#9eb1cf]">{user?.email || "No email on record"}</p>
                   <div className="pt-2 flex flex-wrap gap-2">
-                    <Badge tone="good">Enrolled</Badge>
-                    <Badge tone="neutral">Full-time</Badge>
+                    <Badge tone="good">Active</Badge>
+                    <Badge tone="neutral">JSS 2A</Badge>
                   </div>
                 </div>
               </div>
               <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-lg border border-white/10 bg-white/5 p-3">
                   <p className="text-xs uppercase tracking-wider text-[#8ea4c8]">Admission No</p>
-                  <p className="mt-1 font-medium text-white">{user?.id?.slice(0, 8).toUpperCase() || "—"}</p>
+                  <p className="mt-1 font-medium text-white">{user?.id?.slice(0, 8).toUpperCase() || "ADM-001"}</p>
                 </div>
                 <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs uppercase tracking-wider text-[#8ea4c8]">Academic Year</p>
-                  <p className="mt-1 font-medium text-white">{new Date().getFullYear()}/{new Date().getFullYear() + 1}</p>
+                  <p className="text-xs uppercase tracking-wider text-[#8ea4c8]">Class</p>
+                  <p className="mt-1 font-medium text-white">JSS 2A</p>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                  <p className="text-xs uppercase tracking-wider text-[#8ea4c8]">Section</p>
+                  <p className="mt-1 font-medium text-white">A</p>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                  <p className="text-xs uppercase tracking-wider text-[#8ea4c8]">Session</p>
+                  <p className="mt-1 font-medium text-white">2024/2025</p>
                 </div>
               </div>
             </Card>
