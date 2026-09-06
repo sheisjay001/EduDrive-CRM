@@ -27,40 +27,69 @@ RETURNING id as parent_role_id;
 DELETE FROM users WHERE email = 'parent3@edudrive.demo';
 
 -- Step 4: Insert user with Supabase Auth ID
-INSERT INTO users (id, school_id, role_id, full_name, email, password_hash, status)
-SELECT 
-    '7788b872-8a1b-4dfb-b03f-0311ce0b2082'::uuid,
-    (SELECT id FROM schools WHERE slug = 'demo-school' LIMIT 1),
-    (SELECT id FROM roles WHERE name = 'parent' AND school_id = (SELECT id FROM schools WHERE slug = 'demo-school' LIMIT 1) LIMIT 1),
-    'Demo Parent',
-    'parent3@edudrive.demo',
-    '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyW9iW5J5q6m',
-    'active';
-
--- Step 5: Verify user was inserted
-SELECT id, full_name, email FROM users WHERE id = '7788b872-8a1b-4dfb-b03f-0311ce0b2082'::uuid;
-
--- Step 6: Delete existing role mapping
-DELETE FROM user_roles WHERE user_id = '7788b872-8a1b-4dfb-b03f-0311ce0b2082'::uuid;
-
--- Step 7: Insert user role mapping
--- First check if user exists
+-- Run this step separately and verify it succeeds
 DO $$
+DECLARE
+    v_school_id UUID;
+    v_parent_role_id UUID;
+    v_user_id UUID := '7788b872-8a1b-4dfb-b03f-0311ce0b2082';
+    v_user_count INT;
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM users WHERE id = '7788b872-8a1b-4dfb-b03f-0311ce0b2082'::uuid) THEN
-        RAISE EXCEPTION 'User does not exist in users table';
+    -- Get school ID
+    SELECT id INTO v_school_id FROM schools WHERE slug = 'demo-school' LIMIT 1;
+    IF v_school_id IS NULL THEN
+        RAISE EXCEPTION 'School not found';
     END IF;
     
+    -- Get parent role ID
+    SELECT id INTO v_parent_role_id FROM roles WHERE name = 'parent' AND school_id = v_school_id LIMIT 1;
+    IF v_parent_role_id IS NULL THEN
+        RAISE EXCEPTION 'Parent role not found';
+    END IF;
+    
+    -- Delete existing user
+    DELETE FROM users WHERE email = 'parent3@edudrive.demo';
+    
+    -- Insert user
+    INSERT INTO users (id, school_id, role_id, full_name, email, password_hash, status)
+    VALUES (
+        v_user_id,
+        v_school_id,
+        v_parent_role_id,
+        'Demo Parent',
+        'parent3@edudrive.demo',
+        '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyW9iW5J5q6m',
+        'active'
+    );
+    
+    RAISE NOTICE 'User inserted successfully with ID: %', v_user_id;
+    
+    -- Verify user exists immediately
+    SELECT COUNT(*) INTO v_user_count FROM users WHERE id = v_user_id;
+    RAISE NOTICE 'User count after insert: %', v_user_count;
+    
+    IF v_user_count = 0 THEN
+        RAISE EXCEPTION 'User verification failed immediately after insert - count is 0';
+    END IF;
+    
+    RAISE NOTICE 'User verified in database with count: %', v_user_count;
+    
+    -- Delete existing role mapping
+    DELETE FROM user_roles WHERE user_id = v_user_id;
+    
+    -- Insert role mapping in the same transaction
     INSERT INTO user_roles (user_id, role, school_id)
-    SELECT 
-        '7788b872-8a1b-4dfb-b03f-0311ce0b2082'::uuid,
-        'parent',
-        (SELECT id FROM schools WHERE slug = 'demo-school' LIMIT 1);
-        
+    VALUES (v_user_id, 'parent', v_school_id);
+    
     RAISE NOTICE 'Role mapping inserted successfully';
+    
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'Error inserting role mapping: %', SQLERRM;
+        RAISE NOTICE 'Error occurred: %', SQLERRM;
+        RAISE NOTICE 'SQLSTATE: %', SQLSTATE;
+        -- Check user count again
+        SELECT COUNT(*) INTO v_user_count FROM users WHERE id = v_user_id;
+        RAISE NOTICE 'User count at error time: %', v_user_count;
         RAISE;
 END $$;
 
