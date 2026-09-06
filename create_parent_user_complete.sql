@@ -26,14 +26,13 @@ RETURNING id as parent_role_id;
 -- Step 3: Delete existing user record
 DELETE FROM users WHERE email = 'parent3@edudrive.demo';
 
--- Step 4: Insert user with Supabase Auth ID
--- Run this step separately and verify it succeeds
+-- Step 4: Insert user with Supabase Auth ID - SEPARATE TRANSACTION
+-- Run ONLY this step first and verify it succeeds
 DO $$
 DECLARE
     v_school_id UUID;
     v_parent_role_id UUID;
     v_user_id UUID := '7788b872-8a1b-4dfb-b03f-0311ce0b2082';
-    v_user_count INT;
 BEGIN
     -- Get school ID
     SELECT id INTO v_school_id FROM schools WHERE slug = 'demo-school' LIMIT 1;
@@ -50,7 +49,7 @@ BEGIN
     -- Delete existing user
     DELETE FROM users WHERE email = 'parent3@edudrive.demo';
     
-    -- Insert user
+    -- Insert user ONLY - no role mapping
     INSERT INTO users (id, school_id, role_id, full_name, email, password_hash, status)
     VALUES (
         v_user_id,
@@ -64,20 +63,28 @@ BEGIN
     
     RAISE NOTICE 'User inserted successfully with ID: %', v_user_id;
     
-    -- Verify user exists immediately
-    SELECT COUNT(*) INTO v_user_count FROM users WHERE id = v_user_id;
-    RAISE NOTICE 'User count after insert: %', v_user_count;
-    
-    IF v_user_count = 0 THEN
-        RAISE EXCEPTION 'User verification failed immediately after insert - count is 0';
-    END IF;
-    
-    RAISE NOTICE 'User verified in database with count: %', v_user_count;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Error inserting user: %', SQLERRM;
+        RAISE;
+END $$;
+
+-- Step 5: Verify user exists - RUN THIS AFTER STEP 4 SUCCEEDS
+SELECT id, full_name, email, school_id, role_id FROM users WHERE id = '7788b872-8a1b-4dfb-b03f-0311ce0b2082'::uuid;
+
+-- Step 6: Insert role mapping - RUN THIS ONLY AFTER STEP 5 SHOWS THE USER EXISTS
+DO $$
+DECLARE
+    v_school_id UUID;
+    v_user_id UUID := '7788b872-8a1b-4dfb-b03f-0311ce0b2082';
+BEGIN
+    -- Get school ID
+    SELECT id INTO v_school_id FROM schools WHERE slug = 'demo-school' LIMIT 1;
     
     -- Delete existing role mapping
     DELETE FROM user_roles WHERE user_id = v_user_id;
     
-    -- Insert role mapping in the same transaction
+    -- Insert role mapping
     INSERT INTO user_roles (user_id, role, school_id)
     VALUES (v_user_id, 'parent', v_school_id);
     
@@ -85,11 +92,7 @@ BEGIN
     
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'Error occurred: %', SQLERRM;
-        RAISE NOTICE 'SQLSTATE: %', SQLSTATE;
-        -- Check user count again
-        SELECT COUNT(*) INTO v_user_count FROM users WHERE id = v_user_id;
-        RAISE NOTICE 'User count at error time: %', v_user_count;
+        RAISE NOTICE 'Error inserting role mapping: %', SQLERRM;
         RAISE;
 END $$;
 
