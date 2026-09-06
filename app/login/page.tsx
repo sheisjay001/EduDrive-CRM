@@ -15,7 +15,7 @@ export const ROLE_HOME_MAP: Record<string, string> = {
   school_admin: "/dashboard",
   admissions_officer: "/dashboard",
   bursar: "/dashboard",
-  teacher: "/dashboard",
+  teacher: "/teacher/dashboard",
   helpdesk_officer: "/dashboard",
   parent: "/parent/dashboard",
   student: "/student/dashboard",

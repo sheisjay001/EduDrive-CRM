@@ -50,21 +50,27 @@ const STAFF_ROLES: UserRole[] = [
 const ALL_ROLES: UserRole[] = [...STAFF_ROLES, "parent", "student"];
 
 const staffNavigation: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["super_admin", "school_admin", "admissions_officer", "bursar", "teacher", "helpdesk_officer"] },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["super_admin", "school_admin", "admissions_officer", "bursar", "helpdesk_officer"] },
+  { href: "/teacher/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["teacher"] },
   { href: "/admissions", label: "Admissions", icon: ChartSpline, roles: ["super_admin", "school_admin", "admissions_officer"] },
   { href: "/families", label: "Families", icon: Users, roles: ["super_admin", "school_admin"] },
-  { href: "/parents", label: "Parents", icon: Sparkles, roles: ["super_admin", "school_admin", "admissions_officer", "teacher", "helpdesk_officer"] },
-  { href: "/students", label: "Students", icon: GraduationCap, roles: ["super_admin", "school_admin", "bursar", "teacher", "parent", "student"] },
+  { href: "/parents", label: "Parents", icon: Sparkles, roles: ["super_admin", "school_admin", "admissions_officer", "helpdesk_officer"] },
+  { href: "/teacher/parents", label: "Parents", icon: Sparkles, roles: ["teacher"] },
+  { href: "/students", label: "Students", icon: GraduationCap, roles: ["super_admin", "school_admin", "bursar", "parent", "student"] },
+  { href: "/teacher/students", label: "Students", icon: GraduationCap, roles: ["teacher"] },
   { href: "/finance", label: "Finance", icon: CreditCard, roles: ["super_admin", "school_admin", "bursar", "parent"] },
   { href: "/messaging", label: "Messaging", icon: MessageSquareText, roles: ["super_admin", "school_admin", "parent", "student"] },
+  { href: "/teacher/messaging", label: "Messaging", icon: MessageSquareText, roles: ["teacher"] },
   { href: "/helpdesk", label: "Help Desk", icon: LifeBuoy, roles: ["super_admin", "school_admin", "helpdesk_officer", "parent", "student"] },
   { href: "/staff", label: "Staff", icon: ShieldCheck, roles: ["super_admin", "school_admin"] },
   { href: "/reports", label: "Reports", icon: FileBarChart2, roles: ["super_admin", "school_admin", "student"] },
+  { href: "/teacher/reports", label: "Reports", icon: FileBarChart2, roles: ["teacher"] },
   { href: "/settings", label: "Settings", icon: Settings, roles: ["super_admin", "school_admin", "parent"] },
   { href: "/activity", label: "Activity", icon: Sparkles, roles: ["super_admin", "school_admin"] },
   { href: "/analytics", label: "Analytics", icon: ChartSpline, roles: ["super_admin", "school_admin"] },
   { href: "/frontdesk", label: "Frontdesk", icon: LifeBuoy, roles: ["super_admin", "school_admin"] },
   { href: "/reminders", label: "Reminders", icon: CalendarCheck, roles: ["super_admin", "school_admin", "admissions_officer", "bursar", "student"] },
+  { href: "/teacher/reminders", label: "Schedule", icon: CalendarCheck, roles: ["teacher"] },
 ];
 
 const parentNavigation: NavItem[] = [
