@@ -16,7 +16,7 @@ export default function FamiliesPage() {
   const { data, isLoading, refetch } = useFamiliesQuery();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingFamily, setEditingFamily] = useState<string | null>(null);
-  const [editFormData, setEditFormData] = useState({});
+  const [editFormData, setEditFormData] = useState<{ household_name?: string; billing_contact_parent_id?: string }>({});
   const [addFormData, setAddFormData] = useState({ household_name: "", billing_contact_parent_id: "" });
 
   const user = getUser();
@@ -160,7 +160,7 @@ export default function FamiliesPage() {
               <input
                 key="household_name"
                 type="text"
-                defaultValue={family.householdName}
+                value={editFormData.household_name ?? ""}
                 onChange={(e) => setEditFormData({ ...editFormData, household_name: e.target.value })}
                 className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white"
               />

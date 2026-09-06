@@ -16,7 +16,7 @@ export default function ParentsPage() {
   const { data, isLoading, refetch } = useParentsQuery();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingParent, setEditingParent] = useState<string | null>(null);
-  const [editFormData, setEditFormData] = useState({});
+  const [editFormData, setEditFormData] = useState<{ full_name?: string; email?: string; phone?: string; relationship?: string }>({});
   const [addFormData, setAddFormData] = useState({ full_name: "", email: "", phone: "", relationship: "", family_id: "" });
 
   const user = getUser();
@@ -183,7 +183,7 @@ export default function ParentsPage() {
               <input
                 key="full_name"
                 type="text"
-                defaultValue={parent.name}
+                value={editFormData.full_name ?? ""}
                 onChange={(e) => setEditFormData({ ...editFormData, full_name: e.target.value })}
                 className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white"
               />

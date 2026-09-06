@@ -91,14 +91,14 @@ export default function FinancePage() {
                 invoice.student,
                 invoice.term,
                 editingInvoice === invoice.id ? (
-                  <input type="text" defaultValue={invoice.amountDue} onChange={(e) => setEditFormData({ ...editFormData, amount_due: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white" />
+                  <input type="text" value={editFormData.amount_due || ""} onChange={(e) => setEditFormData({ ...editFormData, amount_due: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white" />
                 ) : (
                   invoice.amountDue
                 ),
                 invoice.amountPaid,
                 invoice.dueDate,
                 editingInvoice === invoice.id ? (
-                  <input type="text" defaultValue={invoice.status} onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white" />
+                  <input type="text" value={editFormData.status ?? ""} onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white" />
                 ) : (
                   <Badge key={`${invoice.id}-status`} tone={invoice.status === "Paid" ? "good" : invoice.status === "Overdue" ? "danger" : "warn"}>
                     {invoice.status}

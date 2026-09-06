@@ -16,7 +16,7 @@ export default function StudentsPage() {
   const { data, isLoading, refetch } = useStudentsQuery();
   const [isImporting, setIsImporting] = useState(false);
   const [editingStudent, setEditingStudent] = useState<string | null>(null);
-  const [editFormData, setEditFormData] = useState<Record<string, unknown>>({});
+  const [editFormData, setEditFormData] = useState<{ first_name?: string; last_name?: string; admission_no?: string; gender?: string; date_of_birth?: string; class_id?: string; status?: string }>({});
   const [showAddForm, setShowAddForm] = useState(false);
   const [addFormData, setAddFormData] = useState<Record<string, string>>({
     first_name: "",
@@ -280,7 +280,7 @@ export default function StudentsPage() {
               <input
                 key="first_name"
                 type="text"
-                defaultValue={student.first_name}
+                value={editFormData.first_name ?? ""}
                 onChange={(e) => setEditFormData({ ...editFormData, first_name: e.target.value })}
                 className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white"
               />
@@ -293,7 +293,7 @@ export default function StudentsPage() {
               <input
                 key="class_id"
                 type="text"
-                defaultValue={student.class_id || ''}
+                value={editFormData.class_id ?? ""}
                 onChange={(e) => setEditFormData({ ...editFormData, class_id: e.target.value })}
                 className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white"
               />
