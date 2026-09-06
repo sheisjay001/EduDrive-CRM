@@ -15,7 +15,7 @@ INSERT INTO roles (school_id, name, permissions)
 SELECT 
     (SELECT id FROM schools WHERE slug = 'demo-school' LIMIT 1),
     'parent',
-    ARRAY['view_children', 'view_invoices', 'create_tickets', 'view_tickets']
+    '["view_children", "view_invoices", "create_tickets", "view_tickets"]'::jsonb
 WHERE NOT EXISTS (
     SELECT 1 FROM roles 
     WHERE school_id = (SELECT id FROM schools WHERE slug = 'demo-school' LIMIT 1)
