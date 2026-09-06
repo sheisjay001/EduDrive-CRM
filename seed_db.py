@@ -46,8 +46,16 @@ def seed_database():
             permissions=["all"]
         )
         print(f"Created role: {admin_role.name}")
-        
-        # Create demo user
+
+        # Create parent role
+        parent_role = role_repo.create(
+            school_id=school.id,
+            name="parent",
+            permissions=["view_children", "view_invoices", "create_tickets", "view_tickets"]
+        )
+        print(f"Created role: {parent_role.name}")
+
+        # Create demo user (school admin)
         user_repo = UserRepository(db)
         demo_user = user_repo.create(
             school_id=school.id,
@@ -58,6 +66,17 @@ def seed_database():
             status="active"
         )
         print(f"Created user: {demo_user.email}")
+
+        # Create demo parent user
+        parent_user = user_repo.create(
+            school_id=school.id,
+            role_id=parent_role.id,
+            full_name="Demo Parent",
+            email="parent3@edudrive.demo",
+            password_hash=get_password_hash("password123"),
+            status="active"
+        )
+        print(f"Created parent user: {parent_user.email}")
         
         # Create classes
         class_repo = ClassRepository(db)
@@ -190,8 +209,12 @@ def seed_database():
         
         print("\n✅ Database seeded successfully!")
         print(f"Demo credentials:")
-        print(f"  Email: admin@greenfieldcollege.ng")
-        print(f"  Password: password123")
+        print(f"  School Admin:")
+        print(f"    Email: admin@greenfieldcollege.ng")
+        print(f"    Password: password123")
+        print(f"  Parent:")
+        print(f"    Email: parent3@edudrive.demo")
+        print(f"    Password: password123")
         
     except Exception as e:
         print(f"❌ Error seeding database: {e}")
