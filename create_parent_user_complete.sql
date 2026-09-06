@@ -32,6 +32,9 @@ BEGIN
     -- Delete existing user record if exists
     DELETE FROM users WHERE email = v_email;
     
+    -- Delete existing role mapping if exists
+    DELETE FROM user_roles WHERE user_id = v_user_id;
+    
     -- Insert user with Supabase Auth ID
     INSERT INTO users (id, school_id, role_id, full_name, email, password_hash, status)
     VALUES (
@@ -44,8 +47,12 @@ BEGIN
         'active'
     );
     
-    -- Delete existing role mapping if exists
-    DELETE FROM user_roles WHERE user_id = v_user_id;
+    -- Verify user was inserted
+    IF NOT EXISTS (SELECT 1 FROM users WHERE id = v_user_id) THEN
+        RAISE EXCEPTION 'Failed to insert user with ID %', v_user_id;
+    END IF;
+    
+    RAISE NOTICE 'User inserted successfully with ID: %', v_user_id;
     
     -- Insert user role mapping
     INSERT INTO user_roles (user_id, role, school_id)
