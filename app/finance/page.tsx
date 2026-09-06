@@ -17,7 +17,7 @@ export default function FinancePage() {
   const { data, isLoading, refetch } = useFinanceQuery();
   const { data: feeData, isLoading: feeLoading } = useFeeStructuresQuery();
   const [editingInvoice, setEditingInvoice] = useState<string | null>(null);
-  const [editFormData, setEditFormData] = useState({});
+  const [editFormData, setEditFormData] = useState<{ amount_due?: string; status?: string }>({});
 
   const user = getUser();
   const userRole = (user as { role?: string })?.role || "school_admin";
@@ -91,7 +91,7 @@ export default function FinancePage() {
                 invoice.student,
                 invoice.term,
                 editingInvoice === invoice.id ? (
-                  <input type="text" value={editFormData.amount_due || ""} onChange={(e) => setEditFormData({ ...editFormData, amount_due: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white" />
+                  <input type="text" value={editFormData.amount_due ?? ""} onChange={(e) => setEditFormData({ ...editFormData, amount_due: e.target.value })} className="rounded border border-white/20 bg-white/10 px-2 py-1 text-sm text-white" />
                 ) : (
                   invoice.amountDue
                 ),

@@ -54,7 +54,7 @@ export default function ParentMessagingPage() {
             <Card className="p-12 text-center">
               <MessageSquare className="h-16 w-16 mx-auto text-[#9eb1cf] mb-4" />
               <h3 className="text-xl font-semibold text-white mb-2">No Messages</h3>
-              <p className="text-[#9eb1cf]">You haven't received any messages from the school yet.</p>
+              <p className="text-[#9eb1cf]">You haven&apos;t received any messages from the school yet.</p>
             </Card>
           ) : (
             messages.map((msg) => (

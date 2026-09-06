@@ -13,10 +13,10 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1
 export const ROLE_HOME_MAP: Record<string, string> = {
   super_admin: "/dashboard",
   school_admin: "/dashboard",
-  admissions_officer: "/dashboard",
-  bursar: "/dashboard",
+  admissions_officer: "/admissions-officer/dashboard",
+  bursar: "/bursar/dashboard",
   teacher: "/teacher/dashboard",
-  helpdesk_officer: "/dashboard",
+  helpdesk_officer: "/helpdesk-officer/dashboard",
   parent: "/parent/dashboard",
   student: "/student/dashboard",
 };

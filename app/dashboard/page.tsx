@@ -112,7 +112,7 @@ export default function DashboardPage() {
             <Card className="mb-6 p-6 border-[#d9a441]/30 bg-[#d9a441]/5">
               <SectionTitle
                 title="Your School Login Link"
-                description="Share this unique link with your staff and parents for them to access your school's portal"
+                description="Share this unique link with your staff and parents for them to access your school&apos;s portal"
               />
               <div className="mt-4 flex items-center gap-4">
                 <div className="flex-1 rounded-2xl border border-white/10 bg-white/10 px-4 py-3">

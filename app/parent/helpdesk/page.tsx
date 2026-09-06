@@ -129,7 +129,7 @@ export default function ParentHelpdeskPage() {
               <Card className="p-12 text-center">
                 <Ticket className="h-16 w-16 mx-auto text-[#9eb1cf] mb-4" />
                 <h3 className="text-xl font-semibold text-white mb-2">No Tickets</h3>
-                <p className="text-[#9eb1cf]">You haven't submitted any support tickets yet.</p>
+                <p className="text-[#9eb1cf]">You haven&apos;t submitted any support tickets yet.</p>
               </Card>
             ) : (
               tickets.map((ticket) => (

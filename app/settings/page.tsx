@@ -147,7 +147,7 @@ export default function SettingsPage() {
     <AppShell
       eyebrow="School Settings"
       title="Brand, billing, and channel configuration"
-      description="Set the school's identity, payment providers, sender profiles, and academic structure from a configuration space built for administrators."
+      description="Set the school&apos;s identity, payment providers, sender profiles, and academic structure from a configuration space built for administrators."
     >
       {isLoading || !data ? (
         <LoadingPanel />
