@@ -4876,6 +4876,42 @@ def get_parent_communications(current_user: AuthUser = Depends(get_current_user)
         return {"communications": [], "messages": []}
 
 
+@router.get("/parent/tickets")
+def get_parent_tickets(current_user: AuthUser = Depends(get_current_user)):
+    """Get tickets for the logged-in parent"""
+    if current_user.role != "parent":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('tickets').select('*').eq('parent_id', current_user.id).order('created_at', desc=True).limit(50).execute()
+        tickets = result.data or []
+        return {"tickets": tickets}
+    except Exception as e:
+        print(f"Error fetching parent tickets: {e}")
+        return {"tickets": []}
+
+
+@router.post("/parent/tickets")
+def create_parent_ticket(payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Create a ticket for the logged-in parent"""
+    if current_user.role != "parent":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('tickets').insert({
+            'school_id': current_user.schoolId,
+            'parent_id': current_user.id,
+            'subject': payload.get('subject'),
+            'description': payload.get('description'),
+            'priority': payload.get('priority', 'medium'),
+            'status': 'open'
+        }).execute()
+        return {"success": True, "ticket": result.data[0]}
+    except Exception as e:
+        print(f"Error creating parent ticket: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/student/academic-records")
 def get_student_academic_records(current_user: AuthUser = Depends(get_current_user)):
     """Get academic records for the logged-in student"""
@@ -4910,6 +4946,42 @@ def get_student_attendance(current_user: AuthUser = Depends(get_current_user)):
     except Exception as e:
         print(f"Error fetching student attendance: {e}")
         return {"attendance": []}
+
+
+@router.get("/student/tickets")
+def get_student_tickets(current_user: AuthUser = Depends(get_current_user)):
+    """Get tickets for the logged-in student"""
+    if current_user.role != "student":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('tickets').select('*').eq('student_id', current_user.id).order('created_at', desc=True).limit(50).execute()
+        tickets = result.data or []
+        return {"tickets": tickets}
+    except Exception as e:
+        print(f"Error fetching student tickets: {e}")
+        return {"tickets": []}
+
+
+@router.post("/student/tickets")
+def create_student_ticket(payload: dict, current_user: AuthUser = Depends(get_current_user)):
+    """Create a ticket for the logged-in student"""
+    if current_user.role != "student":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    supabase = get_supabase_client()
+    try:
+        result = supabase.table('tickets').insert({
+            'school_id': current_user.schoolId,
+            'student_id': current_user.id,
+            'subject': payload.get('subject'),
+            'description': payload.get('description'),
+            'priority': payload.get('priority', 'medium'),
+            'status': 'open'
+        }).execute()
+        return {"success": True, "ticket": result.data[0]}
+    except Exception as e:
+        print(f"Error creating student ticket: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/student/assignments")
