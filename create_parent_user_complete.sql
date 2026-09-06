@@ -4,14 +4,13 @@
 -- Then run this script to link the user to your custom tables
 
 -- Step 1: Get the Supabase Auth user ID from the dashboard
--- Replace 'YOUR_SUPABASE_AUTH_USER_ID' with the actual UUID from Supabase Auth
--- You can find this in Authentication > Users in your Supabase dashboard
+-- The user ID from Supabase Auth: 7788b872-8a1b-4dfb-b03f-0311ce0b2082
 
 DO $$
 DECLARE
     v_school_id UUID;
     v_parent_role_id UUID;
-    v_user_id UUID := 'YOUR_SUPABASE_AUTH_USER_ID'; -- REPLACE THIS
+    v_user_id UUID := '7788b872-8a1b-4dfb-b03f-0311ce0b2082'; -- Supabase Auth User ID
     v_email TEXT := 'parent3@edudrive.demo';
 BEGIN
     -- Get school
