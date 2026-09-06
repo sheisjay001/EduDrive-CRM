@@ -68,21 +68,21 @@ const staffNavigation: NavItem[] = [
 ];
 
 const parentNavigation: NavItem[] = [
-  { href: "/dashboard/parent", label: "Dashboard", icon: LayoutDashboard, roles: ["parent"] },
-  { href: "/students", label: "My Children", icon: Users, roles: ["parent"] },
-  { href: "/finance", label: "Invoices & Payments", icon: CreditCard, roles: ["parent"] },
-  { href: "/helpdesk", label: "Support Tickets", icon: Ticket, roles: ["parent"] },
-  { href: "/messaging", label: "Messages", icon: MessageSquareText, roles: ["parent"] },
-  { href: "/settings/bus-routes", label: "Transport", icon: Bus, roles: ["parent"] },
+  { href: "/parent/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["parent"] },
+  { href: "/parent/students", label: "My Children", icon: Users, roles: ["parent"] },
+  { href: "/parent/finance", label: "Invoices & Payments", icon: CreditCard, roles: ["parent"] },
+  { href: "/parent/helpdesk", label: "Support Tickets", icon: Ticket, roles: ["parent"] },
+  { href: "/parent/messaging", label: "Messages", icon: MessageSquareText, roles: ["parent"] },
+  { href: "/parent/settings/bus-routes", label: "Transport", icon: Bus, roles: ["parent"] },
 ];
 
 const studentNavigation: NavItem[] = [
-  { href: "/dashboard/student", label: "Dashboard", icon: LayoutDashboard, roles: ["student"] },
-  { href: "/students", label: "My Profile", icon: Users, roles: ["student"] },
-  { href: "/helpdesk", label: "Report Issue", icon: Ticket, roles: ["student"] },
-  { href: "/messaging", label: "Messages", icon: MessageSquareText, roles: ["student"] },
-  { href: "/reminders", label: "Schedule", icon: CalendarCheck, roles: ["student"] },
-  { href: "/reports", label: "Results", icon: FileText, roles: ["student"] },
+  { href: "/student/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["student"] },
+  { href: "/student/students", label: "My Profile", icon: Users, roles: ["student"] },
+  { href: "/student/helpdesk", label: "Report Issue", icon: Ticket, roles: ["student"] },
+  { href: "/student/messaging", label: "Messages", icon: MessageSquareText, roles: ["student"] },
+  { href: "/student/reminders", label: "Schedule", icon: CalendarCheck, roles: ["student"] },
+  { href: "/student/reports", label: "Results", icon: FileText, roles: ["student"] },
 ];
 
 function getNavigationForRole(role: string): NavItem[] {

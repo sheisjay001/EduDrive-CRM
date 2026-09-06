@@ -27,7 +27,7 @@ function StudentLoginPageInner() {
 
   useEffect(() => {
     if (getAccessToken()) {
-      router.replace("/dashboard/student");
+      router.replace("/student/dashboard");
     }
   }, [router]);
 

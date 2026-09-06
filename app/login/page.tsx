@@ -11,14 +11,14 @@ import { saveAuthTokens, saveUser, getAccessToken } from "@/services/auth-storag
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
 export const ROLE_HOME_MAP: Record<string, string> = {
-  super_admin: "/dashboard/super-admin",
-  school_admin: "/dashboard/school-admin",
-  admissions_officer: "/dashboard/admissions",
-  bursar: "/dashboard/bursar",
-  teacher: "/dashboard/teacher",
-  helpdesk_officer: "/dashboard/helpdesk",
-  parent: "/dashboard/parent",
-  student: "/dashboard/student",
+  super_admin: "/dashboard",
+  school_admin: "/dashboard",
+  admissions_officer: "/dashboard",
+  bursar: "/dashboard",
+  teacher: "/dashboard",
+  helpdesk_officer: "/dashboard",
+  parent: "/parent/dashboard",
+  student: "/student/dashboard",
 };
 
 export function getHomeRouteForRole(role: string): string {

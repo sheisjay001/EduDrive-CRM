@@ -27,7 +27,7 @@ function ParentLoginPageInner() {
 
   useEffect(() => {
     if (getAccessToken()) {
-      router.replace("/dashboard/parent");
+      router.replace("/parent/dashboard");
     }
   }, [router]);
 
