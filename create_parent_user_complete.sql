@@ -44,11 +44,25 @@ SELECT id, full_name, email FROM users WHERE id = '7788b872-8a1b-4dfb-b03f-0311c
 DELETE FROM user_roles WHERE user_id = '7788b872-8a1b-4dfb-b03f-0311ce0b2082'::uuid;
 
 -- Step 7: Insert user role mapping
-INSERT INTO user_roles (user_id, role, school_id)
-SELECT 
-    '7788b872-8a1b-4dfb-b03f-0311ce0b2082'::uuid,
-    'parent',
-    (SELECT id FROM schools WHERE slug = 'demo-school' LIMIT 1);
+-- First check if user exists
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM users WHERE id = '7788b872-8a1b-4dfb-b03f-0311ce0b2082'::uuid) THEN
+        RAISE EXCEPTION 'User does not exist in users table';
+    END IF;
+    
+    INSERT INTO user_roles (user_id, role, school_id)
+    SELECT 
+        '7788b872-8a1b-4dfb-b03f-0311ce0b2082'::uuid,
+        'parent',
+        (SELECT id FROM schools WHERE slug = 'demo-school' LIMIT 1);
+        
+    RAISE NOTICE 'Role mapping inserted successfully';
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Error inserting role mapping: %', SQLERRM;
+        RAISE;
+END $$;
 
 -- Step 8: Verify the complete setup
 SELECT u.id, u.full_name, u.email, r.name as role_name, s.name as school_name
