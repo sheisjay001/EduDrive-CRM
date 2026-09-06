@@ -8,9 +8,8 @@ import { Button } from "@/components/ui/button";
 import { DataTable, LoadingPanel } from "@/components/dashboard/ops-primitives";
 import { useFamiliesQuery } from "@/hooks/use-crm-query";
 import { Plus, Edit, Trash2, Save, X } from "lucide-react";
-import { getUser, getAccessToken } from "@/services/auth-storage";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
+import { getUser } from "@/services/auth-storage";
+import { apiClient } from "@/services/api-client";
 
 export default function FamiliesPage() {
   const { data, isLoading, refetch } = useFamiliesQuery();
@@ -34,23 +33,12 @@ export default function FamiliesPage() {
 
   const handleSaveEdit = async (familyId: string) => {
     try {
-      const response = await fetch(`${API_URL}/families/${familyId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-        body: JSON.stringify(editFormData),
-      });
-
-      if (response.ok) {
-        setEditingFamily(null);
-        refetch();
-        alert("Family updated successfully");
-      } else {
-        alert("Failed to update family");
-      }
-    } catch {
+      await apiClient.updateFamily(familyId, editFormData);
+      setEditingFamily(null);
+      setEditFormData({});
+      refetch();
+      alert("Family updated successfully");
+    } catch (error) {
       alert("Error updating family");
     }
   };
@@ -64,44 +52,22 @@ export default function FamiliesPage() {
     if (!confirm("Are you sure you want to delete this family?")) return;
 
     try {
-      const response = await fetch(`${API_URL}/families/${familyId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-      });
-
-      if (response.ok) {
-        refetch();
-        alert("Family deleted successfully");
-      } else {
-        alert("Failed to delete family");
-      }
-    } catch {
+      await apiClient.deleteFamily(familyId);
+      refetch();
+      alert("Family deleted successfully");
+    } catch (error) {
       alert("Error deleting family");
     }
   };
 
   const handleAdd = async () => {
     try {
-      const response = await fetch(`${API_URL}/families`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-        body: JSON.stringify(addFormData),
-      });
-
-      if (response.ok) {
-        setShowAddForm(false);
-        setAddFormData({ household_name: "", billing_contact_parent_id: "" });
-        refetch();
-        alert("Family created successfully");
-      } else {
-        alert("Failed to create family");
-      }
-    } catch {
+      await apiClient.createFamily(addFormData);
+      setShowAddForm(false);
+      setAddFormData({ household_name: "", billing_contact_parent_id: "" });
+      refetch();
+      alert("Family created successfully");
+    } catch (error) {
       alert("Error creating family");
     }
   };

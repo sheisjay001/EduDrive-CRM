@@ -8,9 +8,8 @@ import { Button } from "@/components/ui/button";
 import { DataTable, LoadingPanel } from "@/components/dashboard/ops-primitives";
 import { useParentsQuery } from "@/hooks/use-crm-query";
 import { Plus, Edit, Trash2, Save, X } from "lucide-react";
-import { getUser, getAccessToken } from "@/services/auth-storage";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
+import { getUser } from "@/services/auth-storage";
+import { apiClient } from "@/services/api-client";
 
 export default function ParentsPage() {
   const { data, isLoading, refetch } = useParentsQuery();
@@ -36,22 +35,11 @@ export default function ParentsPage() {
 
   const handleSaveEdit = async (parentId: string) => {
     try {
-      const response = await fetch(`${API_URL}/parents/${parentId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-        body: JSON.stringify(editFormData),
-      });
-
-      if (response.ok) {
-        setEditingParent(null);
-        refetch();
-        alert("Parent updated successfully");
-      } else {
-        alert("Failed to update parent");
-      }
+      await apiClient.updateParent(parentId, editFormData);
+      setEditingParent(null);
+      setEditFormData({});
+      refetch();
+      alert("Parent updated successfully");
     } catch (error) {
       alert("Error updating parent");
     }
@@ -66,19 +54,9 @@ export default function ParentsPage() {
     if (!confirm("Are you sure you want to delete this parent?")) return;
 
     try {
-      const response = await fetch(`${API_URL}/parents/${parentId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-      });
-
-      if (response.ok) {
-        refetch();
-        alert("Parent deleted successfully");
-      } else {
-        alert("Failed to delete parent");
-      }
+      await apiClient.deleteParent(parentId);
+      refetch();
+      alert("Parent deleted successfully");
     } catch (error) {
       alert("Error deleting parent");
     }
@@ -86,23 +64,11 @@ export default function ParentsPage() {
 
   const handleAdd = async () => {
     try {
-      const response = await fetch(`${API_URL}/parents`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-        body: JSON.stringify(addFormData),
-      });
-
-      if (response.ok) {
-        setShowAddForm(false);
-        setAddFormData({ full_name: "", email: "", phone: "", relationship: "", family_id: "" });
-        refetch();
-        alert("Parent created successfully");
-      } else {
-        alert("Failed to create parent");
-      }
+      await apiClient.createParent(addFormData);
+      setShowAddForm(false);
+      setAddFormData({ full_name: "", email: "", phone: "", relationship: "", family_id: "" });
+      refetch();
+      alert("Parent created successfully");
     } catch (error) {
       alert("Error creating parent");
     }

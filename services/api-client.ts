@@ -224,6 +224,35 @@ export const apiClient = {
   getStaff() {
     return request<StaffResponse>("/staff/overview", {} as StaffResponse);
   },
+  createStaff(payload: Record<string, unknown>) {
+    return request<{ id: string }>(
+      "/staff",
+      {} as { id: string },
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  updateStaff(staffId: string, payload: Record<string, unknown>) {
+    return request<{ id: string }>(
+      `/staff/${staffId}`,
+      {} as { id: string },
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  deleteStaff(staffId: string) {
+    return request<{ success: boolean }>(
+      `/staff/${staffId}`,
+      {} as { success: boolean },
+      {
+        method: "DELETE",
+      },
+    );
+  },
   getReports() {
     return request<ReportsResponse>("/reports/overview", {} as ReportsResponse);
   },
@@ -272,17 +301,104 @@ export const apiClient = {
   getFamily(familyId: string) {
     return request<FamilyDetail>(`/families/${familyId}`, {} as FamilyDetail);
   },
+  createFamily(payload: Record<string, unknown>) {
+    return request<{ id: string }>(
+      "/families",
+      {} as { id: string },
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  updateFamily(familyId: string, payload: Record<string, unknown>) {
+    return request<{ id: string }>(
+      `/families/${familyId}`,
+      {} as { id: string },
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  deleteFamily(familyId: string) {
+    return request<{ success: boolean }>(
+      `/families/${familyId}`,
+      {} as { success: boolean },
+      {
+        method: "DELETE",
+      },
+    );
+  },
   getParents() {
     return request<ParentsResponse>("/parents", {} as ParentsResponse);
   },
   getParent(parentId: string) {
     return request<ParentDetail>(`/parents/${parentId}`, {} as ParentDetail);
   },
+  createParent(payload: Record<string, unknown>) {
+    return request<{ id: string }>(
+      "/parents",
+      {} as { id: string },
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  updateParent(parentId: string, payload: Record<string, unknown>) {
+    return request<{ id: string }>(
+      `/parents/${parentId}`,
+      {} as { id: string },
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  deleteParent(parentId: string) {
+    return request<{ success: boolean }>(
+      `/parents/${parentId}`,
+      {} as { success: boolean },
+      {
+        method: "DELETE",
+      },
+    );
+  },
   getTicket(ticketId: string) {
     return request<TicketDetailResponse>(`/tickets/${ticketId}`, {} as TicketDetailResponse);
   },
   getInvoice(invoiceId: string) {
     return request<InvoiceDetail>(`/invoices/${invoiceId}`, {} as InvoiceDetail);
+  },
+  createInvoice(payload: Record<string, unknown>) {
+    return request<{ id: string }>(
+      "/invoices",
+      {} as { id: string },
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  updateInvoice(invoiceId: string, payload: Record<string, unknown>) {
+    return request<{ id: string }>(
+      `/invoices/${invoiceId}`,
+      {} as { id: string },
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  deleteInvoice(invoiceId: string) {
+    return request<{ success: boolean }>(
+      `/invoices/${invoiceId}`,
+      {} as { success: boolean },
+      {
+        method: "DELETE",
+      },
+    );
   },
   getStudent(studentId: string) {
     return request<StudentDetail>(`/students/${studentId}`, {} as StudentDetail);

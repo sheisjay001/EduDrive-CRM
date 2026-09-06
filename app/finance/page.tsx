@@ -9,9 +9,8 @@ import { Card } from "@/components/ui/card";
 import { DataTable, KpiGrid, LoadingPanel, SectionTitle } from "@/components/dashboard/ops-primitives";
 import { useFeeStructuresQuery, useFinanceQuery } from "@/hooks/use-crm-query";
 import { Edit, Trash2, Save, X } from "lucide-react";
-import { getUser, getAccessToken } from "@/services/auth-storage";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
+import { getUser } from "@/services/auth-storage";
+import { apiClient } from "@/services/api-client";
 
 export default function FinancePage() {
   const { data, isLoading, refetch } = useFinanceQuery();
@@ -31,13 +30,14 @@ export default function FinancePage() {
 
   const handleSaveEdit = async (invoiceId: string) => {
     try {
-      const response = await fetch(`${API_URL}/invoices/${invoiceId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAccessToken()}` },
-        body: JSON.stringify(editFormData),
-      });
-      if (response.ok) { setEditingInvoice(null); refetch(); alert("Invoice updated"); }
-    } catch { alert("Error updating invoice"); }
+      await apiClient.updateInvoice(invoiceId, editFormData);
+      setEditingInvoice(null);
+      setEditFormData({});
+      refetch();
+      alert("Invoice updated");
+    } catch (error) {
+      alert("Error updating invoice");
+    }
   };
 
   const handleCancelEdit = () => { setEditingInvoice(null); setEditFormData({}); };
@@ -45,12 +45,12 @@ export default function FinancePage() {
   const handleDelete = async (invoiceId: string) => {
     if (!confirm("Delete this invoice?")) return;
     try {
-      const response = await fetch(`${API_URL}/invoices/${invoiceId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${getAccessToken()}` },
-      });
-      if (response.ok) { refetch(); alert("Invoice deleted"); }
-    } catch { alert("Error deleting invoice"); }
+      await apiClient.deleteInvoice(invoiceId);
+      refetch();
+      alert("Invoice deleted");
+    } catch (error) {
+      alert("Error deleting invoice");
+    }
   };
 
   const kpis = [

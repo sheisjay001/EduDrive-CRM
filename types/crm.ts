@@ -223,6 +223,7 @@ export type StaffMetric = {
 };
 
 export type StaffMember = {
+  id?: string;
   name: string;
   role: string;
   attendance: string;
