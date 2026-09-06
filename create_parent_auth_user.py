@@ -1,171 +1,98 @@
 """
-Create a parent user in Supabase Auth and link to custom users table.
+Create a parent user in Supabase Auth and link to custom tables.
 Run this to create the parent3@edudrive.demo user in Supabase Auth.
 """
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app.database.session import get_supabase_client
+import psycopg2
+from urllib.parse import urlparse
+from app.core.config import settings
+
+
+def get_postgres_connection():
+    """Get direct PostgreSQL connection using service role credentials."""
+    # Hardcode the DATABASE_URL for this script
+    database_url = "postgresql://postgres:Soteria2003@db.zdnxmgevzhaqksgllyzg.supabase.co:5432/postgres"
+    
+    return psycopg2.connect(database_url)
 
 
 def create_parent_auth_user():
-    """Create a parent user in Supabase Auth and link to custom tables."""
-    print("Creating parent user in Supabase Auth...")
-    
-    supabase = get_supabase_client()
+    """Create a parent user using direct PostgreSQL connection."""
+    print("Creating parent user using direct PostgreSQL connection...")
     
     try:
-        # First, check if the school exists
-        school_result = supabase.table('schools').select('*').eq('slug', 'demo-school').execute()
+        conn = get_postgres_connection()
+        conn.autocommit = True
+        cursor = conn.cursor()
         
-        if not school_result.data:
-            # Try to get any school
-            all_schools = supabase.table('schools').select('*').execute()
-            if all_schools.data:
-                school = all_schools.data[0]
-                print(f"Using existing school: {school['name']} (slug: {school['slug']})")
-            else:
-                print("❌ No schools found in database. Creating a demo school...")
-                school_data = {
-                    'name': 'Demo School',
-                    'slug': 'demo-school',
-                    'school_type': 'Secondary',
-                    'primary_color': '#14213D'
-                }
-                school_result = supabase.table('schools').insert(school_data).execute()
-                school = school_result.data[0]
-                print(f"Created demo school: {school['name']}")
-        else:
-            school = school_result.data[0]
-            print(f"Found school: {school['name']}")
-        
-        # Check if parent role exists
-        role_result = supabase.table('roles').select('*').eq('school_id', school['id']).eq('name', 'parent').execute()
-        
-        if not role_result.data:
-            role_data = {
-                'school_id': school['id'],
-                'name': 'parent',
-                'permissions': ["view_children", "view_invoices", "create_tickets", "view_tickets"]
-            }
-            role_result = supabase.table('roles').insert(role_data).execute()
-            parent_role = role_result.data[0]
-            print(f"Created parent role: {parent_role['name']}")
-        else:
-            parent_role = role_result.data[0]
-            print(f"Parent role already exists: {parent_role['name']}")
-        
-        # Create user in Supabase Auth
+        supabase_user_id = "7788b872-8a1b-4dfb-b03f-0311ce0b2082"
         email = "parent3@edudrive.demo"
-        password = "password123"
         
-        print(f"\nCreating user in Supabase Auth: {email}")
+        print(f"Using Supabase Auth user ID: {supabase_user_id}")
         
-        try:
-            # Try to sign up the user in Supabase Auth
-            auth_response = supabase.auth.sign_up({
-                "email": email,
-                "password": password,
-                "options": {
-                    "data": {
-                        "full_name": "Demo Parent"
-                    }
-                }
-            })
-            
-            print(f"✅ User created in Supabase Auth")
-            print(f"   User ID: {auth_response.user.id}")
-            print(f"   Email: {auth_response.user.email}")
-            
-            supabase_user_id = auth_response.user.id
-            
-        except Exception as auth_error:
-            # User might already exist in Auth, try to get the user
-            print(f"Auth signup failed (user might exist): {auth_error}")
-            print("Trying to get existing user from Auth...")
-            
-            # We can't directly query Auth users, so we'll check if the user exists in our custom table
-            # and assume they exist in Auth if they do
-            user_result = supabase.table('users').select('*').eq('email', email).execute()
-            if user_result.data:
-                supabase_user_id = user_result.data[0]['id']
-                print(f"Found existing user in custom table with ID: {supabase_user_id}")
-            else:
-                print("❌ User not found in Auth or custom table. Please create manually in Supabase dashboard.")
-                return
-        
-        # Check if user exists in custom users table
-        user_result = supabase.table('users').select('*').eq('email', email).execute()
-        
-        if not user_result.data:
-            # Create user in custom users table
-            from app.core.auth import get_password_hash
-            user_data = {
-                'id': supabase_user_id,  # Use the same ID as Supabase Auth
-                'school_id': school['id'],
-                'role_id': parent_role['id'],
-                'full_name': 'Demo Parent',
-                'email': email,
-                'password_hash': get_password_hash(password),
-                'status': 'active'
-            }
-            user_result = supabase.table('users').insert(user_data).execute()
-            print(f"✅ Created user in custom users table")
-        else:
-            # Update existing user to use the Supabase Auth ID
-            existing_user = user_result.data[0]
-            if existing_user['id'] != supabase_user_id:
-                print(f"Deleting old user record and recreating with Supabase Auth ID")
-                # Delete old record
-                supabase.table('users').delete().eq('email', email).execute()
-                # Insert new record with correct ID
-                from app.core.auth import get_password_hash
-                user_data = {
-                    'id': supabase_user_id,
-                    'school_id': school['id'],
-                    'role_id': parent_role['id'],
-                    'full_name': 'Demo Parent',
-                    'email': email,
-                    'password_hash': get_password_hash(password),
-                    'status': 'active'
-                }
-                supabase.table('users').insert(user_data).execute()
-                print(f"✅ Recreated user in custom users table with correct ID")
-            else:
-                print(f"User already exists in custom users table with correct ID")
-        
-        # Verify user exists in custom users table before creating role mapping
-        verify_user = supabase.table('users').select('*').eq('id', supabase_user_id).execute()
-        if not verify_user.data:
-            print(f"❌ ERROR: User {supabase_user_id} not found in users table after insert")
+        # Get school ID
+        cursor.execute("SELECT id FROM schools WHERE slug = 'demo-school' LIMIT 1")
+        school_row = cursor.fetchone()
+        if not school_row:
+            print("❌ School not found")
             return
-        else:
-            print(f"✅ Verified user exists in users table: {verify_user.data[0]['email']}")
+        school_id = school_row[0]
+        print(f"✅ Found school ID: {school_id}")
         
-        # Check if user role mapping exists
-        role_mapping_result = supabase.table('user_roles').select('*').eq('user_id', supabase_user_id).execute()
+        # Get parent role ID
+        cursor.execute("SELECT id FROM roles WHERE school_id = %s AND name = 'parent' LIMIT 1", (school_id,))
+        role_row = cursor.fetchone()
+        if not role_row:
+            print("❌ Parent role not found")
+            return
+        parent_role_id = role_row[0]
+        print(f"✅ Found parent role ID: {parent_role_id}")
         
-        if not role_mapping_result.data:
-            # Create user role mapping
-            role_mapping_data = {
-                'user_id': supabase_user_id,
-                'role': 'parent',
-                'school_id': school['id']
-            }
-            supabase.table('user_roles').insert(role_mapping_data).execute()
-            print(f"✅ Created user role mapping")
-        else:
-            print(f"User role mapping already exists")
+        # Delete existing user
+        cursor.execute("DELETE FROM users WHERE email = %s", (email,))
+        print(f"✅ Deleted existing user record")
+        
+        # Insert user
+        cursor.execute("""
+            INSERT INTO users (id, school_id, role_id, full_name, email, password_hash, status)
+            VALUES (%s, %s, %s, 'Demo Parent', %s, '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyW9iW5J5q6m', 'active')
+        """, (supabase_user_id, school_id, parent_role_id, email))
+        print(f"✅ Inserted user into users table")
+        
+        # Verify user exists
+        cursor.execute("SELECT COUNT(*) FROM users WHERE id = %s", (supabase_user_id,))
+        count = cursor.fetchone()[0]
+        print(f"✅ User count in users table: {count}")
+        
+        if count == 0:
+            print("❌ User not found after insert!")
+            return
+        
+        # Delete existing role mapping
+        cursor.execute("DELETE FROM user_roles WHERE user_id = %s", (supabase_user_id,))
+        print(f"✅ Deleted existing role mapping")
+        
+        # Insert role mapping
+        cursor.execute("""
+            INSERT INTO user_roles (user_id, role, school_id)
+            VALUES (%s, 'parent', %s)
+        """, (supabase_user_id, school_id))
+        print(f"✅ Inserted role mapping")
+        
+        cursor.close()
+        conn.close()
         
         print("\n✅ Parent user setup complete!")
         print(f"\nLogin credentials:")
         print(f"   Email: {email}")
-        print(f"   Password: {password}")
+        print(f"   Password: password123")
         print(f"\nAfter login, user will be redirected to: /parent/dashboard")
         
     except Exception as e:
-        print(f"❌ Error creating parent user: {e}")
+        print(f"❌ Error: {e}")
         import traceback
         traceback.print_exc()
 
