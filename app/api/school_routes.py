@@ -186,7 +186,6 @@ async def verify_subscription_payment(reference: str):
                 'amount': amount_paid / 100,  # Convert to naira
                 'payment_method': 'paystack',
                 'status': 'completed',
-                'payment_date': payment_data["data"]["paid_at"],
                 'student_count': student_count,
                 'teacher_count': teacher_count,
                 'total_persons': total_persons,
