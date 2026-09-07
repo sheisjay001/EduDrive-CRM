@@ -135,12 +135,8 @@ function SignupForm() {
 
       const data = await response.json();
       
-      // Store tokens
-      saveAuthTokens(data.access_token, data.refresh_token);
-      saveUser(data.user);
-
-      // Redirect to dashboard
-      router.push("/dashboard");
+      // Redirect to login page
+      router.push("/login");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Unable to create account. Please try again.");
     } finally {
