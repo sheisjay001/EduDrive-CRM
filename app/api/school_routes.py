@@ -87,7 +87,7 @@ async def initialize_subscription_payment(request: PaymentInitRequest):
                 "total_amount": total_amount_naira,
                 "currency": "NGN"
             },
-            "callback_url": f"{settings.api_prefix}/schools/payments/verify/{reference}"
+            "callback_url": f"{settings.frontend_url}/signup?reference={reference}"
         }
         
         async with httpx.AsyncClient() as client:
