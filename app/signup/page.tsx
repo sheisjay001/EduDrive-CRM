@@ -9,7 +9,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { saveAuthTokens, saveUser } from "@/services/auth-storage";
 
 const signupSchema = z.object({
   schoolName: z.string().min(2, "School name must be at least 2 characters"),
@@ -133,8 +132,6 @@ function SignupForm() {
         throw new Error(data.detail || "Registration failed");
       }
 
-      const data = await response.json();
-      
       // Redirect to login page
       router.push("/login");
     } catch (err: unknown) {
