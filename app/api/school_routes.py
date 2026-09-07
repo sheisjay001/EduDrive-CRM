@@ -9,30 +9,8 @@ import secrets
 
 router = APIRouter(prefix="/schools", tags=["schools"])
 
-# Subscription plans configuration
-SUBSCRIPTION_PLANS = {
-    "basic": {
-        "name": "Basic",
-        "price": 50000,  # 50,000 NGN in kobo
-        "currency": "NGN",
-        "features": ["Up to 100 students", "Basic reporting", "Email support"],
-        "duration": "monthly"
-    },
-    "standard": {
-        "name": "Standard",
-        "price": 150000,  # 150,000 NGN in kobo
-        "currency": "NGN",
-        "features": ["Up to 500 students", "Advanced reporting", "Priority support", "SMS notifications"],
-        "duration": "monthly"
-    },
-    "premium": {
-        "name": "Premium",
-        "price": 300000,  # 300,000 NGN in kobo
-        "currency": "NGN",
-        "features": ["Unlimited students", "Custom integrations", "24/7 support", "Advanced analytics", "White-label option"],
-        "duration": "monthly"
-    }
-}
+# Pricing configuration
+PRICE_PER_PERSON = 1000  # 1,000 NGN per person (student or teacher)
 
 class SchoolCreateRequest(BaseModel):
     name: str
@@ -57,27 +35,37 @@ class SchoolRegisterRequest(BaseModel):
     email: str
     phone: str
     password: str
-    subscription_plan: str = "standard"
+    student_count: int = 0  # Number of students to onboard
+    teacher_count: int = 0  # Number of teachers to onboard
     payment_method: str = "paystack"  # paystack, flutterwave, bank_transfer
     payment_reference: Optional[str] = None  # For pre-paid registrations
 
 class PaymentInitRequest(BaseModel):
     email: str
-    subscription_plan: str
+    student_count: int = 0
+    teacher_count: int = 0
     payment_method: str = "paystack"
 
-@router.get("/plans")
-async def get_subscription_plans():
-    """Get available subscription plans"""
-    return {"plans": SUBSCRIPTION_PLANS}
+@router.get("/pricing-info")
+async def get_pricing_info():
+    """Get pricing information for school registration"""
+    return {
+        "price_per_person": PRICE_PER_PERSON,
+        "currency": "NGN",
+        "description": "Pricing is based on the total number of students and teachers",
+        "formula": "Total Price = (Student Count + Teacher Count) × ₦1,000"
+    }
 
 @router.post("/payments/initialize")
 async def initialize_subscription_payment(request: PaymentInitRequest):
-    """Initialize payment for school subscription"""
-    if request.subscription_plan not in SUBSCRIPTION_PLANS:
-        raise HTTPException(status_code=400, detail="Invalid subscription plan")
+    """Initialize payment for school subscription based on student/teacher count"""
+    # Calculate total amount
+    total_persons = request.student_count + request.teacher_count
+    total_amount_naira = total_persons * PRICE_PER_PERSON
+    total_amount_kobo = total_amount_naira * 100  # Convert to kobo for Paystack
     
-    plan = SUBSCRIPTION_PLANS[request.subscription_plan]
+    if total_amount_kobo == 0:
+        raise HTTPException(status_code=400, detail="Student and teacher counts cannot both be zero")
     
     if request.payment_method == "paystack":
         paystack_secret_key = settings.paystack_secret_key
@@ -89,13 +77,15 @@ async def initialize_subscription_payment(request: PaymentInitRequest):
         
         payload = {
             "email": request.email,
-            "amount": plan["price"],  # Amount in kobo
+            "amount": total_amount_kobo,
             "reference": reference,
             "metadata": {
-                "subscription_plan": request.subscription_plan,
-                "plan_name": plan["name"],
-                "currency": plan["currency"],
-                "duration": plan["duration"]
+                "student_count": request.student_count,
+                "teacher_count": request.teacher_count,
+                "total_persons": total_persons,
+                "price_per_person": PRICE_PER_PERSON,
+                "total_amount": total_amount_naira,
+                "currency": "NGN"
             },
             "callback_url": f"{settings.api_prefix}/schools/payments/verify/{reference}"
         }
@@ -125,13 +115,15 @@ async def initialize_subscription_payment(request: PaymentInitRequest):
         
         payload = {
             "tx_ref": tx_ref,
-            "amount": plan["price"] / 100,  # Convert from kobo to naira
-            "currency": plan["currency"],
+            "amount": total_amount_naira,
+            "currency": "NGN",
             "email": request.email,
             "customer": {"email": request.email},
             "meta": {
-                "subscription_plan": request.subscription_plan,
-                "plan_name": plan["name"]
+                "student_count": request.student_count,
+                "teacher_count": request.teacher_count,
+                "total_persons": total_persons,
+                "price_per_person": PRICE_PER_PERSON
             },
             "redirect_url": f"{settings.api_prefix}/schools/payments/verify/{tx_ref}"
         }
@@ -181,7 +173,10 @@ async def verify_subscription_payment(reference: str):
             
             # Extract metadata
             metadata = payment_data["data"]["metadata"]
-            subscription_plan = metadata.get("subscription_plan", "standard")
+            student_count = metadata.get("student_count", 0)
+            teacher_count = metadata.get("teacher_count", 0)
+            total_persons = metadata.get("total_persons", 0)
+            total_amount = metadata.get("total_amount", 0)
             email = payment_data["data"]["customer"]["email"]
             amount_paid = payment_data["data"]["amount"]
             
@@ -192,13 +187,21 @@ async def verify_subscription_payment(reference: str):
                 'payment_method': 'paystack',
                 'status': 'completed',
                 'payment_date': payment_data["data"]["paid_at"],
-                'metadata': metadata
+                'metadata': {
+                    'student_count': student_count,
+                    'teacher_count': teacher_count,
+                    'total_persons': total_persons,
+                    'total_amount': total_amount
+                }
             }).execute()
             
             return {
                 "success": True,
                 "payment": payment_result.data[0],
-                "subscription_plan": subscription_plan,
+                "student_count": student_count,
+                "teacher_count": teacher_count,
+                "total_persons": total_persons,
+                "total_amount": total_amount,
                 "message": "Payment verified successfully. Complete registration with /schools/register endpoint."
             }
     
@@ -220,9 +223,11 @@ async def register_school(request: SchoolRegisterRequest):
             if not payment_verification.get("success"):
                 raise HTTPException(status_code=400, detail="Payment verification failed")
             
-            # Verify the subscription plan matches
-            if payment_verification.get("subscription_plan") != request.subscription_plan:
-                raise HTTPException(status_code=400, detail="Subscription plan mismatch")
+            # Verify the counts match
+            if payment_verification.get("student_count") != request.student_count:
+                raise HTTPException(status_code=400, detail="Student count mismatch")
+            if payment_verification.get("teacher_count") != request.teacher_count:
+                raise HTTPException(status_code=400, detail="Teacher count mismatch")
         
         # Generate slug from school name
         import re
@@ -232,7 +237,7 @@ async def register_school(request: SchoolRegisterRequest):
         school_result = supabase.table('schools').insert({
             'name': request.school_name,
             'slug': slug,
-            'subscription_plan': request.subscription_plan,
+            'subscription_plan': 'custom',  # Custom plan based on counts
             'is_active': True
         }).execute()
         
@@ -300,7 +305,9 @@ async def register_school(request: SchoolRegisterRequest):
                 "id": school_id,
                 "name": request.school_name,
                 "slug": school_slug,
-                "subscription_plan": request.subscription_plan
+                "subscription_plan": "custom",
+                "student_count": request.student_count,
+                "teacher_count": request.teacher_count
             }
         }
     except HTTPException:
