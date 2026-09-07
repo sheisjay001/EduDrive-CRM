@@ -247,28 +247,51 @@ async def register_school(request: SchoolRegisterRequest):
         school_id = school_result.data[0]['id']
         school_slug = school_result.data[0]['slug']
         
-        # Create admin user in Supabase Auth
-        auth_response = supabase.auth.sign_up({
+        # Create admin user in Supabase Auth with auto-confirm
+        # Use admin API with service role to bypass email confirmation
+        supabase_admin = get_supabase_client()
+        auth_response = supabase_admin.auth.admin.create_user({
             'email': request.email,
             'password': request.password,
-            'options': {
-                'data': {
-                    'full_name': request.admin_name,
-                    'phone': request.phone
-                }
+            'email_confirm': True,
+            'user_metadata': {
+                'full_name': request.admin_name,
+                'phone': request.phone
+            },
+            'app_metadata': {
+                'provider': 'email',
+                'providers': ['email']
             }
         })
         
         if not auth_response.user:
-            raise HTTPException(status_code=500, detail="Failed to create user")
+            raise HTTPException(status_code=500, detail="Failed to create user in Supabase Auth")
+        
+        user_id = auth_response.user.id
+        
+        # Create user entry in custom users table
+        try:
+            user_result = supabase.table('users').insert({
+                'id': user_id,
+                'email': request.email,
+                'full_name': request.admin_name,
+                'phone': request.phone,
+                'school_id': school_id,
+                'is_active': True
+            }).execute()
+            print(f"Created user entry: {user_result}")
+        except Exception as e:
+            print(f"Error creating user entry: {e}")
+            # Continue anyway
         
         # Create user role entry
         try:
             role_result = supabase.table('user_roles').insert({
-                'user_id': auth_response.user.id,
+                'user_id': user_id,
                 'role': 'school_admin',
                 'school_id': school_id
             }).execute()
+            print(f"Created user role: {role_result}")
         except Exception as e:
             print(f"Error creating user role: {e}")
             # Continue anyway - role might be optional
