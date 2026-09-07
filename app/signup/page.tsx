@@ -111,6 +111,8 @@ function SignupForm() {
     setError(null);
 
     try {
+      console.log("Starting registration with payment reference:", paymentReference);
+      
       const response = await fetch(`${API_URL}/schools/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -127,14 +129,19 @@ function SignupForm() {
         }),
       });
 
+      console.log("Registration response status:", response.status);
+
       if (!response.ok) {
         const data = await response.json();
+        console.error("Registration failed:", data);
         throw new Error(data.detail || "Registration failed");
       }
 
+      console.log("Registration successful, redirecting to login");
       // Redirect to login page
       router.push("/login");
     } catch (err: unknown) {
+      console.error("Registration error:", err);
       setError(err instanceof Error ? err.message : "Unable to create account. Please try again.");
     } finally {
       setSubmitting(false);
