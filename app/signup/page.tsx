@@ -3,8 +3,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import { Building2, Calculator } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -32,8 +32,9 @@ type SignupValues = z.infer<typeof signupSchema>;
 
 const PRICE_PER_PERSON = 1000; // 1,000 NGN per person
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paymentStep, setPaymentStep] = useState(false);
@@ -56,6 +57,15 @@ export default function SignupPage() {
   const teacherCount = form.watch("teacherCount");
   const totalPersons = studentCount + teacherCount;
   const totalAmount = totalPersons * PRICE_PER_PERSON;
+
+  // Check if payment reference is in URL (callback from Paystack)
+  useEffect(() => {
+    const reference = searchParams.get("reference");
+    if (reference) {
+      setPaymentReference(reference);
+      setPaymentStep(true);
+    }
+  }, [searchParams]);
 
   const initializePayment = async () => {
     setSubmitting(true);
@@ -135,16 +145,6 @@ export default function SignupPage() {
       setSubmitting(false);
     }
   };
-
-  // Check if payment reference is in URL (callback from Paystack)
-  useState(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const reference = urlParams.get("reference");
-    if (reference) {
-      setPaymentReference(reference);
-      setPaymentStep(true);
-    }
-  });
 
   const onSubmit = paymentStep ? completeRegistration : initializePayment;
 
@@ -308,5 +308,13 @@ export default function SignupPage() {
         </motion.div>
       </div>
     </main>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SignupForm />
+    </Suspense>
   );
 }
