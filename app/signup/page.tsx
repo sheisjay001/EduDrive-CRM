@@ -32,6 +32,8 @@ type SignupValues = z.infer<typeof signupSchema>;
 
 const PRICE_PER_PERSON = 1000; // 1,000 NGN per person
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
+
 function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -72,7 +74,7 @@ function SignupForm() {
     setError(null);
 
     try {
-      const response = await fetch("/api/v1/schools/payments/initialize", {
+      const response = await fetch(`${API_URL}/schools/payments/initialize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -110,7 +112,7 @@ function SignupForm() {
     setError(null);
 
     try {
-      const response = await fetch("/api/v1/schools/register", {
+      const response = await fetch(`${API_URL}/schools/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
