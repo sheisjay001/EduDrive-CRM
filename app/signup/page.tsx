@@ -65,6 +65,21 @@ function SignupForm() {
     if (reference) {
       setPaymentReference(reference);
       setPaymentStep(true);
+      
+      // Retrieve form data from sessionStorage
+      if (typeof window !== "undefined") {
+        const storedData = sessionStorage.getItem("registrationFormData");
+        if (storedData) {
+          const formData = JSON.parse(storedData);
+          form.reset(formData);
+          sessionStorage.removeItem("registrationFormData");
+          
+          // Auto-submit registration after a short delay
+          setTimeout(() => {
+            completeRegistration();
+          }, 500);
+        }
+      }
     }
   }, [searchParams]);
 
@@ -73,6 +88,22 @@ function SignupForm() {
     setError(null);
 
     try {
+      const formData = {
+        schoolName: form.getValues("schoolName"),
+        fullName: form.getValues("fullName"),
+        email: form.getValues("email"),
+        phone: form.getValues("phone"),
+        password: form.getValues("password"),
+        confirmPassword: form.getValues("confirmPassword"),
+        studentCount,
+        teacherCount,
+      };
+      
+      // Store form data in sessionStorage for retrieval after payment
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("registrationFormData", JSON.stringify(formData));
+      }
+      
       const response = await fetch(`${API_URL}/schools/payments/initialize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
