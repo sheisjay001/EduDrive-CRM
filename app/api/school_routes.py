@@ -187,12 +187,10 @@ async def verify_subscription_payment(reference: str):
                 'payment_method': 'paystack',
                 'status': 'completed',
                 'payment_date': payment_data["data"]["paid_at"],
-                'metadata': {
-                    'student_count': student_count,
-                    'teacher_count': teacher_count,
-                    'total_persons': total_persons,
-                    'total_amount': total_amount
-                }
+                'student_count': student_count,
+                'teacher_count': teacher_count,
+                'total_persons': total_persons,
+                'total_amount': total_amount
             }).execute()
             
             return {
