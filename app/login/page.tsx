@@ -147,15 +147,6 @@ function LoginPageInner() {
                 Sign up
               </a>
             </p>
-            <p className="mt-2">
-              <a href="/parent-login" className="text-blue-600 hover:underline">
-                Parent Portal
-              </a>
-              {" | "}
-              <a href="/student-login" className="text-blue-600 hover:underline">
-                Student Portal
-              </a>
-            </p>
           </div>
         </CardContent>
       </Card>
