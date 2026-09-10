@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 import secrets
@@ -7,7 +7,8 @@ import uuid
 
 from app.core.config import settings
 from app.database.session import get_db
-from app.core.auth import get_password_hash, authenticate_user, create_tokens_for_user
+from app.core.auth import get_password_hash, authenticate_user, create_tokens_for_user, get_current_user
+from app.schemas.crm import AuthUser
 
 router = APIRouter(prefix="/schools", tags=["schools"])
 
