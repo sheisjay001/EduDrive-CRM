@@ -272,7 +272,24 @@ def reset_password(payload: ResetPasswordRequest) -> dict[str, str]:
 def dashboard_summary(current_user: AuthUser = Depends(get_current_user)) -> DashboardResponse:
     if not has_permission(current_user, "dashboard:view"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
-    return demo_data.get_dashboard()
+    
+    # Fetch actual school name from database
+    db = get_db()
+    cursor = db.cursor()
+    try:
+        if current_user.schoolId:
+            cursor.execute("SELECT name FROM schools WHERE id = %s", (current_user.schoolId,))
+            school_result = cursor.fetchone()
+            school_name = school_result['name'] if school_result else "Your School"
+        else:
+            school_name = "Your School"
+    finally:
+        cursor.close()
+    
+    # Get dashboard data and update school name
+    dashboard = demo_data.get_dashboard()
+    dashboard.schoolName = school_name
+    return dashboard
 
 
 @router.get("/leads", response_model=AdmissionsResponse)
