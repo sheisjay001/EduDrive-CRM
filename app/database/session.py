@@ -8,10 +8,14 @@ from app.core.config import settings
 def get_tidb_connection():
     """Get TiDB database connection"""
     try:
-        # SSL configuration for TiDB Cloud
+        # SSL configuration for TiDB Cloud (always required)
         ssl_context = ssl.create_default_context()
         if settings.tidb_ca_path:
             ssl_context.load_verify_locations(cafile=settings.tidb_ca_path)
+        else:
+            # For TiDB Cloud, use SSL without custom CA
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
         
         connection = pymysql.connect(
             host=settings.tidb_host,
@@ -20,7 +24,7 @@ def get_tidb_connection():
             password=settings.tidb_password,
             database=settings.tidb_database,
             cursorclass=DictCursor,
-            ssl={'ssl_context': ssl_context} if settings.tidb_ca_path else None,
+            ssl={'ssl_context': ssl_context},
             autocommit=False
         )
         print(f"DEBUG: Connected to TiDB at {settings.tidb_host}:{settings.tidb_port}")
