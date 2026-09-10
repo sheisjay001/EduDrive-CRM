@@ -2,6 +2,9 @@
 -- Converted from PostgreSQL to MySQL/TiDB syntax
 -- Execute this in TiDB SQL Editor
 
+-- Create the database if it doesn't exist
+CREATE DATABASE IF NOT EXISTS edudrive_crm;
+
 -- Select the database
 USE edudrive_crm;
 
