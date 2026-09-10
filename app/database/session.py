@@ -57,4 +57,45 @@ def close_db():
 # Compatibility alias for existing code
 def get_supabase_client():
     """Alias for get_db for backward compatibility during migration"""
-    return get_db()
+    db = get_db()
+    
+    # Create a mock object that mimics Supabase client structure
+    # to prevent crashes during migration
+    class MockSupabaseClient:
+        def __init__(self, connection):
+            self.connection = connection
+            self.auth = MockAuth()
+        
+        def table(self, table_name):
+            return MockTable(self.connection, table_name)
+    
+    class MockAuth:
+        def sign_up(self, data):
+            raise HTTPException(status_code=501, detail="Signup endpoint not yet migrated to TiDB. Use /schools/register instead.")
+        
+        def reset_password_email(self, email):
+            # Mock implementation - just return success
+            return None
+        
+        def sign_in_with_password(self, data):
+            raise HTTPException(status_code=501, detail="Auth endpoint not yet migrated to TiDB. Use /auth/login instead.")
+    
+    class MockTable:
+        def __init__(self, connection, table_name):
+            self.connection = connection
+            self.table_name = table_name
+        
+        def insert(self, data):
+            raise HTTPException(status_code=501, detail=f"Table insert for {self.table_name} not yet migrated to TiDB")
+        
+        def select(self, *columns):
+            raise HTTPException(status_code=501, detail=f"Table select for {self.table_name} not yet migrated to TiDB")
+        
+        def update(self, data):
+            raise HTTPException(status_code=501, detail=f"Table update for {self.table_name} not yet migrated to TiDB")
+        
+        def delete(self):
+            raise HTTPException(status_code=501, detail=f"Table delete for {self.table_name} not yet migrated to TiDB")
+    
+    from fastapi import HTTPException
+    return MockSupabaseClient(db)
