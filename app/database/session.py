@@ -11,6 +11,7 @@ def get_tidb_connection():
         # SSL configuration for TiDB Cloud (always required)
         ssl_context = ssl.create_default_context()
         if settings.tidb_ca_path:
+            # Load CA certificate from file
             ssl_context.load_verify_locations(cafile=settings.tidb_ca_path)
         else:
             # For TiDB Cloud, use SSL without custom CA
