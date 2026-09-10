@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import uuid
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -7,7 +8,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.core.config import settings
-from app.database.session import get_supabase_client
+from app.database.session import get_db
 from app.schemas.crm import AuthUser
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
@@ -23,75 +24,53 @@ def get_password_hash(password: str) -> str:
 
 
 def authenticate_user(email: str, password: str) -> Optional[AuthUser]:
-    """Authenticate user using Supabase"""
+    """Authenticate user using TiDB database"""
     try:
-        supabase = get_supabase_client()
+        db = get_db()
+        cursor = db.cursor()
         
         print(f"Attempting to authenticate user: {email}")
         
-        # Use Supabase auth
-        response = supabase.auth.sign_in_with_password({
-            "email": email,
-            "password": password
-        })
+        # Query user from database
+        query = """
+            SELECT u.id, u.email, u.full_name, u.password_hash, u.status, u.is_active,
+                   ur.role, ur.school_id, s.slug as school_slug
+            FROM users u
+            LEFT JOIN user_roles ur ON u.id = ur.user_id
+            LEFT JOIN schools s ON ur.school_id = s.id
+            WHERE u.email = %s AND u.is_active = TRUE
+        """
+        cursor.execute(query, (email,))
+        user_data = cursor.fetchone()
         
-        print(f"Supabase auth response: {response}")
-        
-        if not response.user:
-            print("No user returned from Supabase")
+        if not user_data:
+            print("User not found or inactive")
             return None
         
-        # Get user metadata from Supabase
-        user_data = response.user.user_metadata
+        # Verify password
+        if not verify_password(password, user_data['password_hash']):
+            print("Invalid password")
+            return None
         
-        # Get user role from custom user_roles table
-        try:
-            role_response = supabase.table('user_roles').select('role, school_id').eq('user_id', response.user.id).execute()
-            print(f"Role response: {role_response}")
-        except Exception as e:
-            print(f"Error fetching user roles: {e}")
-            role_response = None
+        # Update last login
+        update_query = "UPDATE users SET last_login_at = NOW() WHERE id = %s"
+        cursor.execute(update_query, (user_data['id'],))
+        db.commit()
         
-        role = "school_admin"  # Default
-        school_id = ""
-        school_slug = ""
+        role = user_data.get('role', 'school_admin') or 'school_admin'
+        school_id = user_data.get('school_id', '') or ''
+        school_slug = user_data.get('school_slug', '') or ''
         
-        if role_response and role_response.data:
-            role = role_response.data[0].get('role', 'school_admin')
-            school_id = role_response.data[0].get('school_id', '')
-            
-            # Get school slug
-            if school_id:
-                try:
-                    school_response = supabase.table('schools').select('slug').eq('id', school_id).execute()
-                    if school_response.data:
-                        school_slug = school_response.data[0].get('slug', '')
-                except Exception as e:
-                    print(f"Error fetching school slug: {e}")
-        
-        print(f"Authenticated user: {response.user.email} with role: {role}, school_slug: {school_slug}")
+        print(f"Authenticated user: {user_data['email']} with role: {role}, school_slug: {school_slug}")
         
         return AuthUser(
-            id=response.user.id,
+            id=user_data['id'],
             schoolId=school_id,
             schoolSlug=school_slug,
             role=role,
-            fullName=user_data.get('full_name', response.user.email.split('@')[0]),
-            email=response.user.email,
+            fullName=user_data['full_name'],
+            email=user_data['email'],
         )
-    except ValueError as e:
-        # Supabase not configured - return demo user for testing
-        if "SUPABASE_URL" in str(e):
-            print("Supabase not configured, using demo mode")
-            return AuthUser(
-                id="demo-user-id",
-                schoolId="demo-school-id",
-                role="school_admin",
-                fullName="Demo User",
-                email=email,
-            )
-        print(f"Value error during authentication: {e}")
-        return None
     except Exception as e:
         print(f"Authentication error: {e}")
         import traceback

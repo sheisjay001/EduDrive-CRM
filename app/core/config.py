@@ -5,10 +5,16 @@ class Settings(BaseSettings):
     app_name: str = "EduDrive CRM API"
     api_prefix: str = "/api/v1"
     debug: bool = True
-    supabase_url: str = ""
-    supabase_key: str = ""
-    supabase_service_role_key: str = ""
-    database_url: str = ""  # For alembic migrations
+    
+    # TiDB Database Configuration
+    tidb_host: str = ""
+    tidb_port: int = 4000
+    tidb_user: str = ""
+    tidb_password: str = ""
+    tidb_database: str = "edudrive_crm"
+    tidb_ca_path: str = ""
+    
+    # JWT Configuration
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60

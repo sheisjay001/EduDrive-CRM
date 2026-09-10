@@ -1,30 +1,50 @@
-from supabase import create_client, Client
+import pymysql
+from pymysql.cursors import DictCursor
+import ssl
 
 from app.core.config import settings
 
 
-def get_supabase() -> Client:
-    """Get Supabase client instance"""
-    print(f"DEBUG: SUPABASE_URL = {settings.supabase_url}")
-    print(f"DEBUG: SUPABASE_KEY = {settings.supabase_key[:20]}..." if settings.supabase_key else "DEBUG: SUPABASE_KEY = None")
-    print(f"DEBUG: SUPABASE_SERVICE_ROLE_KEY = {settings.supabase_service_role_key[:20]}..." if settings.supabase_service_role_key else "DEBUG: SUPABASE_SERVICE_ROLE_KEY = None")
-    
-    if not settings.supabase_url or not settings.supabase_key:
-        raise ValueError("SUPABASE_URL and SUPABASE_KEY environment variables must be set")
-    
-    # Use service role key for backend operations (has full database access)
-    key = settings.supabase_service_role_key if settings.supabase_service_role_key else settings.supabase_key
-    print(f"DEBUG: Using key type = {'SERVICE_ROLE' if settings.supabase_service_role_key else 'PUBLIC'}")
-    return create_client(settings.supabase_url, key)
+def get_tidb_connection():
+    """Get TiDB database connection"""
+    try:
+        # SSL configuration for TiDB Cloud
+        ssl_context = ssl.create_default_context()
+        if settings.tidb_ca_path:
+            ssl_context.load_verify_locations(cafile=settings.tidb_ca_path)
+        
+        connection = pymysql.connect(
+            host=settings.tidb_host,
+            port=settings.tidb_port,
+            user=settings.tidb_user,
+            password=settings.tidb_password,
+            database=settings.tidb_database,
+            cursorclass=DictCursor,
+            ssl={'ssl_context': ssl_context} if settings.tidb_ca_path else None,
+            autocommit=False
+        )
+        print(f"DEBUG: Connected to TiDB at {settings.tidb_host}:{settings.tidb_port}")
+        return connection
+    except Exception as e:
+        print(f"ERROR: Failed to connect to TiDB: {e}")
+        raise ValueError(f"TiDB connection failed: {e}")
 
 
-# Global Supabase client (initialized lazily)
-_supabase_client: Client | None = None
+# Global TiDB connection (initialized lazily)
+_tidb_connection = None
 
 
-def get_supabase_client() -> Client:
-    """Get or create Supabase client instance"""
-    global _supabase_client
-    if _supabase_client is None:
-        _supabase_client = get_supabase()
-    return _supabase_client
+def get_db():
+    """Get or create TiDB database connection"""
+    global _tidb_connection
+    if _tidb_connection is None or not _tidb_connection.open:
+        _tidb_connection = get_tidb_connection()
+    return _tidb_connection
+
+
+def close_db():
+    """Close database connection"""
+    global _tidb_connection
+    if _tidb_connection and _tidb_connection.open:
+        _tidb_connection.close()
+        _tidb_connection = None

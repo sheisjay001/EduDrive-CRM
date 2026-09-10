@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.core.auth import get_current_user, AuthUser, authenticate_user, create_tokens_for_user
-from app.database.session import get_supabase_client
-from app.core.config import settings
-import httpx
+from typing import Optional
 import secrets
+import httpx
+import uuid
+
+from app.core.config import settings
+from app.database.session import get_db
+from app.core.auth import get_password_hash, authenticate_user, create_tokens_for_user
 
 router = APIRouter(prefix="/schools", tags=["schools"])
 
@@ -149,7 +151,8 @@ async def initialize_subscription_payment(request: PaymentInitRequest):
 @router.get("/payments/verify/{reference}")
 async def verify_subscription_payment(reference: str):
     """Verify subscription payment and complete school registration"""
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     
     try:
         # Verify payment with Paystack
@@ -181,20 +184,17 @@ async def verify_subscription_payment(reference: str):
             amount_paid = payment_data["data"]["amount"]
             
             # Store payment record
-            payment_result = supabase.table('payments').insert({
-                'reference': reference,
-                'amount': amount_paid / 100,  # Convert to naira
-                'payment_method': 'paystack',
-                'status': 'completed',
-                'student_count': student_count,
-                'teacher_count': teacher_count,
-                'total_persons': total_persons,
-                'total_amount': total_amount
-            }).execute()
+            payment_id = str(uuid.uuid4())
+            payment_query = """
+                INSERT INTO payments (id, reference, amount, status, student_count, teacher_count, total_persons, total_amount, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            """
+            cursor.execute(payment_query, (payment_id, reference, amount_paid / 100, 'completed', student_count, teacher_count, total_persons, total_amount))
+            db.commit()
             
             return {
                 "success": True,
-                "payment": payment_result.data[0],
+                "payment": {"id": payment_id, "reference": reference},
                 "student_count": student_count,
                 "teacher_count": teacher_count,
                 "total_persons": total_persons,
@@ -203,15 +203,20 @@ async def verify_subscription_payment(reference: str):
             }
     
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
+        db.rollback()
         print(f"Payment verification error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 @router.post("/register")
 async def register_school(request: SchoolRegisterRequest):
     """Register a new school and create admin user"""
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     
     try:
         # Verify payment if reference is provided
@@ -230,77 +235,41 @@ async def register_school(request: SchoolRegisterRequest):
         import re
         slug = re.sub(r'[^a-z0-9]+', '-', request.school_name.lower()).strip('-')
         
+        # Generate UUIDs
+        school_id = str(uuid.uuid4())
+        user_id = str(uuid.uuid4())
+        user_role_id = str(uuid.uuid4())
+        
         # Create school
-        school_result = supabase.table('schools').insert({
-            'name': request.school_name,
-            'slug': slug,
-            'subscription_plan': 'custom',  # Custom plan based on counts
-            'is_active': True
-        }).execute()
+        school_query = """
+            INSERT INTO schools (id, name, slug, subscription_plan, is_active, created_at)
+            VALUES (%s, %s, %s, %s, %s, NOW())
+        """
+        cursor.execute(school_query, (school_id, request.school_name, slug, 'custom', True))
         
-        if not school_result.data:
-            raise HTTPException(status_code=500, detail="Failed to create school")
-        
-        school_id = school_result.data[0]['id']
-        school_slug = school_result.data[0]['slug']
-        
-        # Create admin user in Supabase Auth with auto-confirm
-        # Use admin API with service role to bypass email confirmation
-        supabase_admin = get_supabase_client()
-        auth_response = supabase_admin.auth.admin.create_user({
-            'email': request.email,
-            'password': request.password,
-            'email_confirm': True,
-            'user_metadata': {
-                'full_name': request.admin_name,
-                'phone': request.phone
-            },
-            'app_metadata': {
-                'provider': 'email',
-                'providers': ['email']
-            }
-        })
-        
-        if not auth_response.user:
-            raise HTTPException(status_code=500, detail="Failed to create user in Supabase Auth")
-        
-        user_id = auth_response.user.id
-        
-        # Create user entry in custom users table
-        try:
-            user_result = supabase.table('users').insert({
-                'id': user_id,
-                'email': request.email,
-                'full_name': request.admin_name,
-                'phone': request.phone,
-                'school_id': school_id,
-                'is_active': True
-            }).execute()
-            print(f"Created user entry: {user_result}")
-        except Exception as e:
-            print(f"Error creating user entry: {e}")
-            # Continue anyway
+        # Create admin user with hashed password
+        password_hash = get_password_hash(request.password)
+        user_query = """
+            INSERT INTO users (id, school_id, full_name, email, password_hash, phone, is_active, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+        """
+        cursor.execute(user_query, (user_id, school_id, request.admin_name, request.email, password_hash, request.phone, True))
         
         # Create user role entry
-        try:
-            role_result = supabase.table('user_roles').insert({
-                'user_id': user_id,
-                'role': 'school_admin',
-                'school_id': school_id
-            }).execute()
-            print(f"Created user role: {role_result}")
-        except Exception as e:
-            print(f"Error creating user role: {e}")
-            # Continue anyway - role might be optional
+        role_query = """
+            INSERT INTO user_roles (id, user_id, role, school_id, created_at)
+            VALUES (%s, %s, %s, %s, NOW())
+        """
+        cursor.execute(role_query, (user_role_id, user_id, 'school_admin', school_id))
         
         # Link payment to school if reference was provided
         if request.payment_reference:
-            try:
-                supabase.table('payments').update({
-                    'school_id': school_id
-                }).eq('reference', request.payment_reference).execute()
-            except Exception as e:
-                print(f"Error linking payment to school: {e}")
+            update_payment_query = """
+                UPDATE payments SET school_id = %s WHERE reference = %s
+            """
+            cursor.execute(update_payment_query, (school_id, request.payment_reference))
+        
+        db.commit()
         
         # Authenticate user to get tokens
         user = authenticate_user(request.email, request.password)
@@ -324,58 +293,72 @@ async def register_school(request: SchoolRegisterRequest):
             "school": {
                 "id": school_id,
                 "name": request.school_name,
-                "slug": school_slug,
+                "slug": slug,
                 "subscription_plan": "custom",
                 "student_count": request.student_count,
                 "teacher_count": request.teacher_count
             }
         }
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
+        db.rollback()
         print(f"Registration error: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 @router.get("/slug/{slug}")
 async def get_school_by_slug(
     slug: str
 ):
     """Get school information by slug"""
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     
     try:
-        result = supabase.table('schools').select('*').eq('slug', slug).execute()
+        query = "SELECT * FROM schools WHERE slug = %s"
+        cursor.execute(query, (slug,))
+        result = cursor.fetchone()
         
-        if not result.data:
+        if not result:
             raise HTTPException(status_code=404, detail="School not found")
         
-        return {"school": result.data[0]}
+        return {"school": result}
     except HTTPException:
         raise
     except Exception as e:
         print(f"Error fetching school by slug: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 @router.get("/validate/{slug}")
 async def validate_school_slug(
     slug: str
 ):
     """Check if a school slug exists and is active"""
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     
     try:
-        result = supabase.table('schools').select('*').eq('slug', slug).eq('is_active', True).execute()
+        query = "SELECT * FROM schools WHERE slug = %s AND is_active = TRUE"
+        cursor.execute(query, (slug,))
+        result = cursor.fetchone()
         
-        if not result.data:
+        if not result:
             raise HTTPException(status_code=404, detail="School not found or inactive")
         
-        return {"valid": True, "school": result.data[0]}
+        return {"valid": True, "school": result}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 @router.post("/")
 async def create_school(
@@ -383,35 +366,45 @@ async def create_school(
     current_user: AuthUser = Depends(get_current_user)
 ):
     """Create a new school (super-admin only)"""
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     
     try:
-        result = supabase.table('schools').insert({
-            'name': request.name,
-            'slug': request.slug,
-            'domain': request.domain,
-            'logo_url': request.logo_url,
-            'primary_color': request.primary_color,
-            'secondary_color': request.secondary_color,
-            'subscription_plan': request.subscription_plan
-        }).execute()
+        school_id = str(uuid.uuid4())
+        query = """
+            INSERT INTO schools (id, name, slug, domain, logo_url, primary_color, secondary_color, subscription_plan, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        """
+        cursor.execute(query, (
+            school_id, request.name, request.slug, request.domain,
+            request.logo_url, request.primary_color, request.secondary_color, request.subscription_plan
+        ))
+        db.commit()
         
-        return {"success": True, "school": result.data[0]}
+        return {"success": True, "school": {"id": school_id}}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 @router.get("/")
 async def get_schools(
     current_user: AuthUser = Depends(get_current_user)
 ):
     """Get all active schools"""
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     
     try:
-        result = supabase.table('active_schools').select('*').execute()
-        return {"schools": result.data}
+        query = "SELECT * FROM schools WHERE status = 'active'"
+        cursor.execute(query)
+        result = cursor.fetchall()
+        return {"schools": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 @router.patch("/{school_id}")
 async def update_school(
@@ -420,25 +413,39 @@ async def update_school(
     current_user: AuthUser = Depends(get_current_user)
 ):
     """Update school information"""
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     
     try:
         update_data = {}
-        if request.name:
+        if request.name is not None:
             update_data['name'] = request.name
-        if request.domain:
+        if request.slug is not None:
+            update_data['slug'] = request.slug
+        if request.domain is not None:
             update_data['domain'] = request.domain
-        if request.logo_url:
+        if request.logo_url is not None:
             update_data['logo_url'] = request.logo_url
-        if request.primary_color:
+        if request.primary_color is not None:
             update_data['primary_color'] = request.primary_color
-        if request.secondary_color:
+        if request.secondary_color is not None:
             update_data['secondary_color'] = request.secondary_color
-        if request.is_active is not None:
-            update_data['is_active'] = request.is_active
+        if request.subscription_plan is not None:
+            update_data['subscription_plan'] = request.subscription_plan
         
-        result = supabase.table('schools').update(update_data).eq('id', school_id).execute()
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No fields to update")
         
-        return {"success": True, "school": result.data[0]}
+        set_clause = ", ".join([f"{k} = %s" for k in update_data.keys()])
+        values = list(update_data.values()) + [school_id]
+        
+        query = f"UPDATE schools SET {set_clause} WHERE id = %s"
+        cursor.execute(query, values)
+        db.commit()
+        
+        return {"success": True}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
