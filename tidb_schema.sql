@@ -6,7 +6,7 @@
 CREATE DATABASE IF NOT EXISTS edudrive_crm;
 
 -- Select the database
-USE sys;
+USE edudrive_crm;
 
 -- ============================================================================
 -- 1. BASE SCHEMA
