@@ -6,7 +6,7 @@
 CREATE DATABASE IF NOT EXISTS edudrive_crm;
 
 -- Select the database
-USE edudrive_crm;
+USE sys;
 
 -- ============================================================================
 -- 1. BASE SCHEMA
@@ -33,7 +33,6 @@ CREATE TABLE IF NOT EXISTS roles (
     name VARCHAR(80) NOT NULL,
     permissions JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
     INDEX idx_school_id (school_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -50,8 +49,6 @@ CREATE TABLE IF NOT EXISTS users (
     is_active BOOLEAN DEFAULT TRUE,
     last_login_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
-    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE SET NULL,
     INDEX idx_school_id (school_id),
     INDEX idx_email (email),
     INDEX idx_role_id (role_id)
@@ -78,7 +75,6 @@ CREATE TABLE IF NOT EXISTS families (
     status VARCHAR(30) DEFAULT 'active',
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
     INDEX idx_school_id (school_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -94,8 +90,6 @@ CREATE TABLE IF NOT EXISTS parents (
     preferred_channel VARCHAR(30) DEFAULT 'email',
     status VARCHAR(30) DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
-    FOREIGN KEY (family_id) REFERENCES families(id) ON DELETE CASCADE,
     INDEX idx_school_id (school_id),
     INDEX idx_family_id (family_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -109,7 +103,6 @@ CREATE TABLE IF NOT EXISTS classes (
     level_group VARCHAR(50),
     status VARCHAR(30) DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
     INDEX idx_school_id (school_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -121,7 +114,6 @@ CREATE TABLE IF NOT EXISTS subjects (
     code VARCHAR(20),
     status VARCHAR(30) DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
     INDEX idx_school_id (school_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -139,9 +131,6 @@ CREATE TABLE IF NOT EXISTS students (
     date_of_birth DATE,
     status VARCHAR(30) DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
-    FOREIGN KEY (family_id) REFERENCES families(id) ON DELETE CASCADE,
-    FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL,
     INDEX idx_school_id (school_id),
     INDEX idx_family_id (family_id),
     INDEX idx_class_id (class_id)
@@ -163,7 +152,6 @@ CREATE TABLE IF NOT EXISTS leads (
     notes TEXT,
     status VARCHAR(30) DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
     INDEX idx_school_id (school_id),
     INDEX idx_stage (stage)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -181,8 +169,6 @@ CREATE TABLE IF NOT EXISTS invoices (
     status VARCHAR(30) DEFAULT 'issued',
     issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
-    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
     INDEX idx_school_id (school_id),
     INDEX idx_student_id (student_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -201,8 +187,6 @@ CREATE TABLE IF NOT EXISTS payments (
     total_amount DECIMAL(10,2) DEFAULT 0,
     paid_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
-    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
     INDEX idx_school_id (school_id),
     INDEX idx_reference (reference)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -220,10 +204,6 @@ CREATE TABLE IF NOT EXISTS tickets (
     sla_due_at TIMESTAMP NULL,
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
-    FOREIGN KEY (family_id) REFERENCES families(id) ON DELETE CASCADE,
-    FOREIGN KEY (parent_id) REFERENCES parents(id) ON DELETE CASCADE,
-    FOREIGN KEY (assignee_user_id) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_school_id (school_id),
     INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -238,8 +218,7 @@ CREATE TABLE IF NOT EXISTS message_logs (
     body TEXT NOT NULL,
     delivery_status VARCHAR(30) DEFAULT 'queued',
     sent_at TIMESTAMP NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Activity logs table
@@ -252,7 +231,6 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     action VARCHAR(120) NOT NULL,
     meta_data JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
     INDEX idx_school_id (school_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -266,7 +244,6 @@ CREATE TABLE IF NOT EXISTS reminders (
     due_date TIMESTAMP NOT NULL,
     status VARCHAR(30) DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
     INDEX idx_school_id (school_id),
     INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -281,7 +258,6 @@ CREATE TABLE IF NOT EXISTS terms (
     is_current BOOLEAN DEFAULT FALSE,
     status VARCHAR(30) DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
     INDEX idx_school_id (school_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -296,9 +272,6 @@ CREATE TABLE IF NOT EXISTS fee_structures (
     description TEXT,
     status VARCHAR(30) DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
-    FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL,
-    FOREIGN KEY (term_id) REFERENCES terms(id) ON DELETE SET NULL,
     INDEX idx_school_id (school_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -315,8 +288,6 @@ CREATE TABLE IF NOT EXISTS staff (
     department VARCHAR(50),
     status VARCHAR(30) DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_school_id (school_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -331,8 +302,6 @@ CREATE TABLE IF NOT EXISTS pins (
     is_blocked BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     used_at TIMESTAMP NULL,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
-    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE SET NULL,
     INDEX idx_school_id (school_id),
     INDEX idx_pin (pin)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -350,8 +319,6 @@ CREATE TABLE IF NOT EXISTS cbt_exams (
     end_time TIMESTAMP,
     status VARCHAR(30) DEFAULT 'draft',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
-    FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL,
     INDEX idx_school_id (school_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -365,8 +332,6 @@ CREATE TABLE IF NOT EXISTS notifications (
     type VARCHAR(50),
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_school_id (school_id),
     INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -381,7 +346,6 @@ CREATE TABLE IF NOT EXISTS bus_routes (
     capacity INT,
     status VARCHAR(30) DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
     INDEX idx_school_id (school_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -392,7 +356,6 @@ CREATE TABLE IF NOT EXISTS bus_stops (
     stop_name VARCHAR(100) NOT NULL,
     stop_order INT,
     time_arrival TIME,
-    FOREIGN KEY (route_id) REFERENCES bus_routes(id) ON DELETE CASCADE,
     INDEX idx_route_id (route_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -403,6 +366,5 @@ CREATE TABLE IF NOT EXISTS settings (
     key_name VARCHAR(100) NOT NULL,
     value TEXT,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
     UNIQUE KEY unique_setting (school_id, key_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
