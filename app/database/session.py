@@ -48,3 +48,9 @@ def close_db():
     if _tidb_connection and _tidb_connection.open:
         _tidb_connection.close()
         _tidb_connection = None
+
+
+# Compatibility alias for existing code
+def get_supabase_client():
+    """Alias for get_db for backward compatibility during migration"""
+    return get_db()
