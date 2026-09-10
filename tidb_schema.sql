@@ -2,6 +2,9 @@
 -- Converted from PostgreSQL to MySQL/TiDB syntax
 -- Execute this in TiDB SQL Editor
 
+-- Select the database
+USE edudrive_crm;
+
 -- ============================================================================
 -- 1. BASE SCHEMA
 -- ============================================================================
