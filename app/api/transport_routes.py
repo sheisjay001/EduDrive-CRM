@@ -86,18 +86,22 @@ async def list_bus_routes(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "view")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        result = supabase.table("bus_routes").select("*").order("route_name").execute()
-        routes = result.data or []
+        cursor.execute("SELECT * FROM bus_routes WHERE school_id = %s ORDER BY route_name", (current_user.schoolId,))
+        routes = cursor.fetchall()
+        
         for route in routes:
-            stops_res = supabase.table("bus_stops").select("*").eq("route_id", route["id"]).order("stop_order").execute()
-            route["stops"] = stops_res.data or []
+            cursor.execute("SELECT * FROM bus_stops WHERE route_id = %s ORDER BY stop_order", (route['id'],))
+            route["stops"] = cursor.fetchall()
             route["stop_count"] = len(route["stops"])
             route["name"] = route.get("route_name") or route.get("name")
         return routes
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.get("/bus-routes/{route_id}")
@@ -106,14 +110,17 @@ async def get_bus_route(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "view")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        result = supabase.table("bus_routes").select("*").eq("id", route_id).execute()
-        if not result.data:
+        cursor.execute("SELECT * FROM bus_routes WHERE id = %s AND school_id = %s", (route_id, current_user.schoolId))
+        route = cursor.fetchone()
+        
+        if not route:
             raise HTTPException(status_code=404, detail="Bus route not found")
-        route = result.data[0]
-        stops_res = supabase.table("bus_stops").select("*").eq("route_id", route_id).order("stop_order").execute()
-        route["stops"] = stops_res.data or []
+        
+        cursor.execute("SELECT * FROM bus_stops WHERE route_id = %s ORDER BY stop_order", (route_id,))
+        route["stops"] = cursor.fetchall()
         route["stop_count"] = len(route["stops"])
         route["name"] = route.get("route_name") or route.get("name")
         return route
@@ -121,6 +128,8 @@ async def get_bus_route(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.post("/bus-routes")
@@ -221,15 +230,18 @@ async def list_bus_stops(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "view")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        query = supabase.table("bus_stops").select("*")
         if route_id:
-            query = query.eq("route_id", route_id)
-        result = query.order("stop_order").execute()
-        return result.data or []
+            cursor.execute("SELECT * FROM bus_stops WHERE route_id = %s AND school_id = %s ORDER BY stop_order", (route_id, current_user.schoolId))
+        else:
+            cursor.execute("SELECT * FROM bus_stops WHERE school_id = %s ORDER BY stop_order", (current_user.schoolId,))
+        return cursor.fetchall()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.post("/bus-stops")
@@ -327,27 +339,20 @@ async def list_student_transport(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "view")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        query = supabase.table("student_transport").select("*, students(*)")
         if route_id:
-            query = query.eq("route_id", route_id)
-        if student_id:
-            query = query.eq("student_id", student_id)
-        if current_user.role == "parent" and current_user.id:
-            families = supabase.table("families").select("*").eq("primary_contact_id", current_user.id).execute()
-            family_ids = [f["id"] for f in (families.data or [])]
-            students = supabase.table("students").select("*").in_("family_id", family_ids).execute()
-            student_ids = [s["id"] for s in (students.data or [])]
-            if student_id:
-                if student_id not in student_ids:
-                    return []
-            else:
-                query = query.in_("student_id", student_ids)
-        result = query.execute()
-        return result.data or []
+            cursor.execute("SELECT * FROM student_transport WHERE route_id = %s AND school_id = %s", (route_id, current_user.schoolId))
+        elif student_id:
+            cursor.execute("SELECT * FROM student_transport WHERE student_id = %s AND school_id = %s", (student_id, current_user.schoolId))
+        else:
+            cursor.execute("SELECT * FROM student_transport WHERE school_id = %s", (current_user.schoolId,))
+        return cursor.fetchall()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.post("/students")
@@ -356,26 +361,33 @@ async def assign_student_transport(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "edit")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        existing = supabase.table("student_transport").select("*").eq("student_id", payload.student_id).execute()
-        row = {
-            "student_id": payload.student_id,
-            "route_id": payload.route_id,
-            "stop_id": payload.stop_id,
-            "pickup_location": payload.pickup_location,
-            "dropoff_location": payload.dropoff_location,
-            "status": "active",
-        }
-        if current_user.school_id:
-            row["school_id"] = current_user.school_id
-        if existing.data:
-            result = supabase.table("student_transport").update(row).eq("student_id", payload.student_id).execute()
+        cursor.execute("SELECT * FROM student_transport WHERE student_id = %s", (payload.student_id,))
+        existing = cursor.fetchone()
+        
+        if existing:
+            query = """
+                UPDATE student_transport SET route_id = %s, stop_id = %s, pickup_location = %s, dropoff_location = %s, updated_at = NOW()
+                WHERE student_id = %s
+            """
+            cursor.execute(query, (payload.route_id, payload.stop_id, payload.pickup_location, payload.dropoff_location, payload.student_id))
         else:
-            result = supabase.table("student_transport").insert(row).execute()
-        return result.data[0] if result.data else row
+            transport_id = str(uuid.uuid4())
+            query = """
+                INSERT INTO student_transport (id, school_id, student_id, route_id, stop_id, pickup_location, dropoff_location, status, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            """
+            cursor.execute(query, (transport_id, current_user.schoolId, payload.student_id, payload.route_id, payload.stop_id, payload.pickup_location, payload.dropoff_location, 'active'))
+        
+        db.commit()
+        return {"success": True}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.delete("/students/{student_id}")
@@ -384,12 +396,17 @@ async def unassign_student_transport(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "edit")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        supabase.table("student_transport").delete().eq("student_id", student_id).execute()
+        cursor.execute("DELETE FROM student_transport WHERE student_id = %s", (student_id,))
+        db.commit()
         return {"success": True}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 # ------------------- Vehicles & Tracking -------------------
@@ -399,12 +416,15 @@ async def list_vehicles(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "view")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        result = supabase.table("vehicles").select("*").order("vehicle_number").execute()
-        return result.data or []
+        cursor.execute("SELECT * FROM vehicles WHERE school_id = %s ORDER BY vehicle_number", (current_user.schoolId,))
+        return cursor.fetchall()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.post("/vehicles")
@@ -413,22 +433,31 @@ async def create_vehicle(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "create")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        row = {
-            "vehicle_number": payload.vehicle_number,
-            "vehicle_type": payload.vehicle_type,
-            "capacity": payload.capacity,
-            "driver_name": payload.driver_name,
-            "driver_phone": payload.driver_phone,
-            "status": "active",
-        }
-        if current_user.school_id:
-            row["school_id"] = current_user.school_id
-        result = supabase.table("vehicles").insert(row).execute()
-        return result.data[0] if result.data else row
+        vehicle_id = str(uuid.uuid4())
+        query = """
+            INSERT INTO vehicles (id, school_id, vehicle_number, vehicle_type, capacity, driver_name, driver_phone, status, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        """
+        cursor.execute(query, (
+            vehicle_id,
+            current_user.schoolId,
+            payload.vehicle_number,
+            payload.vehicle_type,
+            payload.capacity,
+            payload.driver_name,
+            payload.driver_phone,
+            'active'
+        ))
+        db.commit()
+        return {"id": vehicle_id, "vehicle_number": payload.vehicle_number}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.put("/vehicles/{vehicle_id}")
@@ -438,20 +467,32 @@ async def update_vehicle(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "edit")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        existing = supabase.table("vehicles").select("id").eq("id", vehicle_id).execute()
-        if not existing.data:
-            raise HTTPException(status_code=404, detail="Vehicle not found")
         changes = payload.model_dump(exclude_none=True)
-        if "last_known_lat" in changes or "last_known_lng" in changes:
-            changes["last_updated"] = datetime.utcnow().isoformat()
-        result = supabase.table("vehicles").update(changes).eq("id", vehicle_id).execute()
-        return result.data[0] if result.data else {"id": vehicle_id, **changes}
+        if not changes:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        set_clause = ", ".join([f"{k} = %s" for k in changes.keys()])
+        values = list(changes.values()) + [vehicle_id, current_user.schoolId]
+        
+        query = f"UPDATE vehicles SET {set_clause}, updated_at = NOW() WHERE id = %s AND school_id = %s"
+        cursor.execute(query, values)
+        
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Vehicle not found")
+        
+        db.commit()
+        return {"id": vehicle_id, **changes}
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.delete("/vehicles/{vehicle_id}")
@@ -460,12 +501,17 @@ async def delete_vehicle(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "delete")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        supabase.table("vehicles").delete().eq("id", vehicle_id).execute()
+        cursor.execute("DELETE FROM vehicles WHERE id = %s AND school_id = %s", (vehicle_id, current_user.schoolId))
+        db.commit()
         return {"success": True}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 compat_router.add_api_route(

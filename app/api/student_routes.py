@@ -47,6 +47,21 @@ async def create_student(
     cursor = db.cursor()
     
     try:
+        # Check school's student limit
+        cursor.execute("SELECT student_count FROM schools WHERE id = %s", (current_user.schoolId,))
+        school = cursor.fetchone()
+        
+        if school and school.get('student_count') is not None:
+            # Count current students
+            cursor.execute("SELECT COUNT(*) as count FROM students WHERE school_id = %s", (current_user.schoolId,))
+            current_count = cursor.fetchone()['count']
+            
+            if current_count >= school['student_count']:
+                raise HTTPException(
+                    status_code=403, 
+                    detail=f"Student limit exceeded. You have {current_count} students but your plan allows only {school['student_count']}. Please upgrade your subscription to add more students."
+                )
+        
         student_id = str(uuid.uuid4())
         query = """
             INSERT INTO students (id, school_id, first_name, last_name, admission_no, gender, date_of_birth, family_id, class_id, lead_id, status, created_at)
@@ -68,6 +83,9 @@ async def create_student(
         db.commit()
         
         return {"success": True, "student_id": student_id}
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))

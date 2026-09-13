@@ -238,12 +238,12 @@ async def register_school(request: SchoolRegisterRequest):
         role_id = str(uuid.uuid4())
         user_id = str(uuid.uuid4())
         
-        # Create school - schema columns: id, name, slug, school_type, primary_color, status, created_at
+        # Create school - schema columns: id, name, slug, school_type, primary_color, status, student_count, teacher_count, created_at
         school_query = """
-            INSERT INTO schools (id, name, slug, school_type, primary_color, status, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            INSERT INTO schools (id, name, slug, school_type, primary_color, status, student_count, teacher_count, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
         """
-        cursor.execute(school_query, (school_id, request.school_name, slug, 'mixed', '#d9a441', 'active'))
+        cursor.execute(school_query, (school_id, request.school_name, slug, 'mixed', '#d9a441', 'active', request.student_count, request.teacher_count))
         
         # Create admin role entry in roles table
         school_admin_permissions = [
@@ -497,8 +497,34 @@ async def signup_school_user(slug: str, request: SchoolUserSignupRequest):
         if existing_user:
             raise HTTPException(status_code=400, detail="User with this email already exists in this school")
         
-        # Get or create appropriate role
+        # Check limits for teachers/students
         role_name = request.role
+        if role_name == "teacher":
+            if school.get('teacher_count') is not None:
+                cursor.execute("""
+                    SELECT COUNT(*) as count FROM users u 
+                    JOIN roles r ON u.role_id = r.id 
+                    WHERE u.school_id = %s AND r.name = 'teacher'
+                """, (school_id,))
+                current_count = cursor.fetchone()['count']
+                
+                if current_count >= school['teacher_count']:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"This school has reached its teacher limit. Please contact the school administrator."
+                    )
+        elif role_name == "student":
+            if school.get('student_count') is not None:
+                cursor.execute("SELECT COUNT(*) as count FROM students WHERE school_id = %s", (school_id,))
+                current_count = cursor.fetchone()['count']
+                
+                if current_count >= school['student_count']:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"This school has reached its student limit. Please contact the school administrator."
+                    )
+        
+        # Get or create appropriate role
         cursor.execute("SELECT * FROM roles WHERE school_id = %s AND name = %s", (school_id, role_name))
         role = cursor.fetchone()
         

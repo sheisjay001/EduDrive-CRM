@@ -623,71 +623,56 @@ def delete_parent(parent_id: str, current_user: AuthUser = Depends(require_role(
 @router.post("/leads/{lead_id}/convert", response_model=ConvertLeadResponse)
 def convert_lead(lead_id: str, payload: ConvertLeadRequest, current_user: AuthUser = Depends(get_current_user)) -> ConvertLeadResponse:
     """Convert a lead into a family and student record"""
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
         # Get the lead
-        lead_result = supabase.table('leads').select('*').eq('id', lead_id).execute()
-        if not lead_result.data:
+        cursor.execute("SELECT * FROM leads WHERE id = %s AND school_id = %s", (lead_id, current_user.schoolId))
+        lead = cursor.fetchone()
+        
+        if not lead:
             raise HTTPException(status_code=404, detail="Lead not found")
         
-        lead = lead_result.data[0]
-        
         # Create family
-        family_result = supabase.table('families').insert({
-            'school_id': current_user.schoolId,
-            'household_name': payload.family.householdName,
-            'billing_contact_parent_id': payload.family.primaryContactParentId,
-            'notes': f'Converted from lead {lead_id}'
-        }).execute()
-        
-        if not family_result.data:
-            raise HTTPException(status_code=500, detail="Failed to create family")
-        
-        family_id = family_result.data[0]['id']
+        family_id = str(uuid.uuid4())
+        cursor.execute("""
+            INSERT INTO families (id, school_id, household_name, billing_contact_parent_id, notes, created_at)
+            VALUES (%s, %s, %s, %s, %s, NOW())
+        """, (family_id, current_user.schoolId, payload.family.householdName, payload.family.primaryContactParentId, f'Converted from lead {lead_id}'))
         
         # Create parent from lead information
-        parent_result = supabase.table('parents').insert({
-            'school_id': current_user.schoolId,
-            'family_id': family_id,
-            'full_name': lead.get('parent_name', 'Unknown'),
-            'email': lead.get('parent_email'),
-            'phone': lead.get('parent_phone'),
-            'relationship': 'primary',
-            'preferred_channel': 'email'
-        }).execute()
+        parent_id = str(uuid.uuid4())
+        cursor.execute("""
+            INSERT INTO parents (id, school_id, family_id, full_name, email, phone, relationship, preferred_channel, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        """, (parent_id, current_user.schoolId, family_id, lead.get('parent_name', 'Unknown'), lead.get('parent_email'), lead.get('parent_phone'), 'primary', 'email'))
         
         # Create student
-        student_result = supabase.table('students').insert({
-            'school_id': current_user.schoolId,
-            'family_id': family_id,
-            'lead_id': lead_id,
-            'first_name': payload.student.firstName,
-            'last_name': payload.student.lastName,
-            'gender': payload.student.gender,
-            'date_of_birth': payload.student.dateOfBirth,
-            'class_id': payload.student.classId,
-            'status': 'active'
-        }).execute()
+        student_id = str(uuid.uuid4())
+        cursor.execute("""
+            INSERT INTO students (id, school_id, family_id, lead_id, first_name, last_name, gender, date_of_birth, class_id, status, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        """, (student_id, current_user.schoolId, family_id, lead_id, payload.student.firstName, payload.student.lastName, payload.student.gender, payload.student.dateOfBirth, payload.student.classId, 'active'))
         
-        if not student_result.data:
-            raise HTTPException(status_code=500, detail="Failed to create student")
+        # Update lead status
+        cursor.execute("UPDATE leads SET stage = 'converted', updated_at = NOW() WHERE id = %s", (lead_id,))
         
-        student_id = student_result.data[0]['id']
-        
-        # Update lead stage to enrolled
-        supabase.table('leads').update({'stage': 'enrolled'}).eq('id', lead_id).execute()
+        db.commit()
         
         return {
             "success": True,
             "family_id": family_id,
-            "student_id": student_id,
-            "message": "Lead successfully converted to family and student"
+            "parent_id": parent_id,
+            "student_id": student_id
         }
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
-        print(f"Error converting lead: {e}")
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.get("/students", response_model=StudentsResponse)
@@ -701,42 +686,48 @@ def students(current_user: AuthUser = Depends(get_current_user)) -> StudentsResp
 def student_detail(student_id: str, current_user: AuthUser = Depends(get_current_user)) -> StudentDetailResponse:
     if not has_permission(current_user, "students:view"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
-    supabase = get_supabase_client()
-    try:
-        result = supabase.table('students').select('*').eq('id', student_id).eq('school_id', current_user.schoolId).execute()
-        if not result.data:
-            raise HTTPException(status_code=404, detail="Student not found")
-        return demo_data.get_student_detail(student_id)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return demo_data.get_student_detail(student_id)
 
 
 @router.patch("/students/{student_id}")
 def update_student(student_id: str, payload: dict, current_user: AuthUser = Depends(require_any_role(["school_admin", "admissions_officer", "teacher"]))) -> dict:
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
         update_data = {}
         if payload.get('first_name'):
             update_data['first_name'] = payload['first_name']
         if payload.get('last_name'):
             update_data['last_name'] = payload['last_name']
-        if payload.get('admission_no'):
-            update_data['admission_no'] = payload['admission_no']
         if payload.get('gender'):
             update_data['gender'] = payload['gender']
         if payload.get('date_of_birth'):
             update_data['date_of_birth'] = payload['date_of_birth']
-        if payload.get('class_id'):
-            update_data['class_id'] = payload['class_id']
         if payload.get('status'):
             update_data['status'] = payload['status']
         
-        result = supabase.table('students').update(update_data).eq('id', student_id).eq('school_id', current_user.schoolId).execute()
-        return {"success": True, "student": result.data[0]}
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        set_clause = ", ".join([f"{k} = %s" for k in update_data.keys()])
+        values = list(update_data.values()) + [student_id, current_user.schoolId]
+        
+        query = f"UPDATE students SET {set_clause}, updated_at = NOW() WHERE id = %s AND school_id = %s"
+        cursor.execute(query, values)
+        
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Student not found")
+        
+        db.commit()
+        return {"success": True}
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.get("/finance/overview", response_model=FinanceResponse)
@@ -1595,42 +1586,78 @@ def get_users(current_user: AuthUser = Depends(require_role("school_admin"))):
 @router.post("/settings/users")
 def create_user(payload: dict, current_user: AuthUser = Depends(require_role("school_admin"))):
     """Create a new user"""
-    supabase = get_supabase_client()
+    from app.core.auth import get_password_hash
+    db = get_db()
+    cursor = db.cursor()
     try:
-        # Create user in Supabase Auth
-        auth_response = supabase.auth.sign_up({
-            'email': payload.get('email'),
-            'password': payload.get('password'),
-            'options': {
-                'data': {
-                    'full_name': payload.get('full_name'),
-                }
-            }
-        })
+        # Check school's teacher/staff limit for teacher roles
+        role = payload.get('role', 'school_admin')
+        if role in ['teacher', 'admissions_officer', 'bursar', 'helpdesk_officer']:
+            cursor.execute("SELECT teacher_count FROM schools WHERE id = %s", (current_user.schoolId,))
+            school = cursor.fetchone()
+            
+            if school and school.get('teacher_count') is not None:
+                # Count current staff (excluding school_admin)
+                cursor.execute("""
+                    SELECT COUNT(*) as count FROM users u 
+                    JOIN roles r ON u.role_id = r.id 
+                    WHERE u.school_id = %s AND r.name IN ('teacher', 'admissions_officer', 'bursar', 'helpdesk_officer')
+                """, (current_user.schoolId,))
+                current_count = cursor.fetchone()['count']
+                
+                if current_count >= school['teacher_count']:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Staff limit exceeded. You have {current_count} staff members but your plan allows only {school['teacher_count']}. Please upgrade your subscription to add more staff."
+                    )
         
-        if not auth_response.user:
-            raise HTTPException(status_code=400, detail="Failed to create user in auth")
+        # Get or create role
+        cursor.execute("SELECT * FROM roles WHERE school_id = %s AND name = %s", (current_user.schoolId, role))
+        role_data = cursor.fetchone()
         
-        # Create user in database
-        user_result = supabase.table('users').insert({
-            'school_id': current_user.schoolId,
-            'full_name': payload.get('full_name'),
-            'email': payload.get('email'),
-            'password_hash': '',  # Password is managed by Supabase Auth
-            'status': 'active'
-        }).execute()
+        if not role_data:
+            role_id = str(uuid.uuid4())
+            # Define permissions based on role
+            if role == "teacher":
+                permissions = ["dashboard:view", "students:view", "students:update", "grades:*", "attendance:*", "messaging:view", "messaging:create", "calendar:view"]
+            elif role == "admissions_officer":
+                permissions = ["dashboard:view", "admissions:*", "leads:*", "parents:view", "calendar:*", "messaging:view", "messaging:create"]
+            elif role == "bursar":
+                permissions = ["dashboard:view", "finance:*", "invoices:*", "payments:*", "students:view", "reports:view"]
+            elif role == "helpdesk_officer":
+                permissions = ["dashboard:view", "helpdesk:*", "tickets:*", "parents:view", "students:view"]
+            else:
+                permissions = []
+            
+            import json
+            cursor.execute(
+                "INSERT INTO roles (id, school_id, name, permissions, created_at) VALUES (%s, %s, %s, %s, NOW())",
+                (role_id, current_user.schoolId, role, json.dumps(permissions))
+            )
+        else:
+            role_id = role_data['id']
         
-        # Create user role
-        supabase.table('user_roles').insert({
-            'user_id': auth_response.user.id,
-            'role': payload.get('role', 'school_admin'),
-            'school_id': current_user.schoolId
-        }).execute()
+        # Create user with hashed password
+        user_id = str(uuid.uuid4())
+        password_hash = get_password_hash(payload.get('password'))
         
-        return {"success": True, "user": user_result.data[0]}
+        cursor.execute(
+            """INSERT INTO users (id, school_id, role_id, full_name, email, password_hash, status, created_at)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())""",
+            (user_id, current_user.schoolId, role_id, payload.get('full_name'), payload.get('email'), password_hash, 'active')
+        )
+        
+        db.commit()
+        return {"success": True, "user_id": user_id}
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
+        db.rollback()
         print(f"Error creating user: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.patch("/settings/users/{user_id}")
