@@ -40,7 +40,7 @@ import type {
 } from "@/types/crm";
 
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://edudrive-crm-backend.onrender.com/api/v1";
 
 let isRefreshing = false;
 let refreshSubscribers: Array<(token: string) => void> = [];
