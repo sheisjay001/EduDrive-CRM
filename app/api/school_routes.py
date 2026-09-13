@@ -45,6 +45,13 @@ class PaymentInitRequest(BaseModel):
     teacher_count: int = 0
     payment_method: str = "paystack"
 
+class SchoolUserSignupRequest(BaseModel):
+    full_name: str
+    email: str
+    phone: str
+    password: str
+    role: str  # teacher, parent, student
+
 @router.get("/pricing-info")
 async def get_pricing_info():
     """Get pricing information for school registration"""
@@ -463,6 +470,108 @@ async def update_school(
         return {"success": True}
     except Exception as e:
         db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
+
+@router.post("/{slug}/signup")
+async def signup_school_user(slug: str, request: SchoolUserSignupRequest):
+    """Register a new user (teacher/parent/student) for an existing school"""
+    db = get_db()
+    cursor = db.cursor()
+    
+    try:
+        # Validate the school exists and is active
+        cursor.execute("SELECT * FROM schools WHERE slug = %s AND status = 'active'", (slug,))
+        school = cursor.fetchone()
+        
+        if not school:
+            raise HTTPException(status_code=404, detail="School not found or inactive")
+        
+        school_id = school['id']
+        
+        # Check if user already exists
+        cursor.execute("SELECT * FROM users WHERE email = %s AND school_id = %s", (request.email, school_id))
+        existing_user = cursor.fetchone()
+        
+        if existing_user:
+            raise HTTPException(status_code=400, detail="User with this email already exists in this school")
+        
+        # Get or create appropriate role
+        role_name = request.role
+        cursor.execute("SELECT * FROM roles WHERE school_id = %s AND name = %s", (school_id, role_name))
+        role = cursor.fetchone()
+        
+        if not role:
+            # Create the role if it doesn't exist
+            role_id = str(uuid.uuid4())
+            
+            # Define permissions based on role
+            if role_name == "teacher":
+                permissions = [
+                    "dashboard:view", "students:view", "students:update", "grades:*",
+                    "attendance:*", "messaging:view", "messaging:create", "calendar:view"
+                ]
+            elif role_name == "parent":
+                permissions = [
+                    "dashboard:view", "children:view", "invoices:view", "payments:view",
+                    "messaging:view", "messaging:create", "helpdesk:view", "helpdesk:create"
+                ]
+            else:  # student
+                permissions = [
+                    "dashboard:view", "grades:view", "attendance:view", "assignments:view",
+                    "messaging:view", "calendar:view"
+                ]
+            
+            import json
+            cursor.execute(
+                "INSERT INTO roles (id, school_id, name, permissions, created_at) VALUES (%s, %s, %s, %s, NOW())",
+                (role_id, school_id, role_name, json.dumps(permissions))
+            )
+            role_id = role_id
+        else:
+            role_id = role['id']
+        
+        # Create the user
+        user_id = str(uuid.uuid4())
+        password_hash = get_password_hash(request.password)
+        
+        cursor.execute(
+            """INSERT INTO users (id, school_id, role_id, full_name, email, phone, password_hash, status, created_at)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())""",
+            (user_id, school_id, role_id, request.full_name, request.email, request.phone, password_hash, 'active')
+        )
+        
+        db.commit()
+        
+        # Authenticate the user to get tokens
+        user = authenticate_user(request.email, request.password)
+        if not user:
+            raise HTTPException(status_code=500, detail="Failed to authenticate after registration")
+        
+        access_token, refresh_token = create_tokens_for_user(user)
+        
+        return {
+            "success": True,
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "fullName": user.fullName,
+                "role": user.role,
+                "schoolId": user.schoolId,
+                "schoolSlug": user.schoolSlug
+            }
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"School user signup error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         cursor.close()
