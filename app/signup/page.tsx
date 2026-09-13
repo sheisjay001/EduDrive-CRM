@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { saveAuthTokens, saveUser } from "@/services/auth-storage";
 
 const signupSchema = z.object({
   schoolName: z.string().min(2, "School name must be at least 2 characters"),
@@ -32,6 +33,21 @@ type SignupValues = z.infer<typeof signupSchema>;
 const PRICE_PER_PERSON = 1000; // 1,000 NGN per person
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
+
+const ROLE_HOME_MAP: Record<string, string> = {
+  super_admin: "/dashboard",
+  school_admin: "/dashboard",
+  admissions_officer: "/admissions-officer/dashboard",
+  bursar: "/bursar/dashboard",
+  teacher: "/teacher/dashboard",
+  helpdesk_officer: "/helpdesk-officer/dashboard",
+  parent: "/parent/dashboard",
+  student: "/student/dashboard",
+};
+
+function getHomeRouteForRole(role: string): string {
+  return ROLE_HOME_MAP[role] || "/dashboard";
+}
 
 function SignupForm() {
   const router = useRouter();
@@ -168,9 +184,19 @@ function SignupForm() {
         throw new Error(data.detail || "Registration failed");
       }
 
-      console.log("Registration successful, redirecting to login");
-      // Redirect to login page
-      router.push("/login");
+      const data = await response.json();
+      console.log("Registration successful, saving auth tokens and redirecting to dashboard");
+
+      if (data.access_token && data.user) {
+        saveAuthTokens(data.access_token, data.refresh_token || "");
+        saveUser(data.user);
+
+        const userRole = data.user.role;
+        const homeRoute = getHomeRouteForRole(userRole);
+        router.replace(homeRoute);
+      } else {
+        router.push("/login");
+      }
     } catch (err: unknown) {
       console.error("Registration error:", err);
       setError(err instanceof Error ? err.message : "Unable to create account. Please try again.");

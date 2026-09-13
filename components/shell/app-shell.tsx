@@ -30,6 +30,7 @@ import { cn, initialsFromName } from "@/lib/utils";
 import { clearAuthTokens } from "@/services/auth-storage";
 import { getUser } from "@/services/auth-storage";
 import { RouteGuard, type UserRole } from "@/components/shell/route-guard";
+import { useSchool } from "@/lib/school-context";
 
 type NavItem = {
   href: string;
@@ -121,9 +122,16 @@ type AppShellProps = {
 function AppShellInner({ title, eyebrow, description, children, allowedRoles, user }: AppShellProps & { user: ReturnType<typeof getUser> }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { schoolInfo } = useSchool();
   const userRole = (user as { role?: string })?.role || "school_admin";
   const userName = (user as { fullName?: string })?.fullName || "User";
   const navigation = getNavigationForRole(userRole);
+
+  const schoolName = schoolInfo?.name
+    ? schoolInfo.name
+    : (user as { schoolSlug?: string })?.schoolSlug
+      ? (user as { schoolSlug: string }).schoolSlug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+      : "Your School";
 
   const handleLogout = () => {
     clearAuthTokens();
@@ -149,7 +157,7 @@ function AppShellInner({ title, eyebrow, description, children, allowedRoles, us
               <Sparkles className="h-4 w-4 text-[#d9a441]" />
             </div>
             <h2 className="font-serif text-2xl text-white">
-              {userRole === "parent" ? "Parent Portal" : userRole === "student" ? "Student Portal" : "Greenfield College"}
+              {userRole === "parent" ? "Parent Portal" : userRole === "student" ? "Student Portal" : schoolName}
             </h2>
             <p className="mt-2 text-sm leading-6 text-[#9eb1cf]">
               {userRole === "parent"
