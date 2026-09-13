@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from typing import Optional, List
 from pydantic import BaseModel
 from app.core.auth import get_current_user, AuthUser
-from app.database.session import get_supabase_client
+from app.database.session import get_db
 import csv
 import io
+import uuid
 
 router = APIRouter(prefix="/students", tags=["students"])
 
@@ -42,38 +43,54 @@ async def create_student(
     if not check_student_permission(current_user):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     
     try:
-        result = supabase.table('students').insert({
-            'school_id': current_user.schoolId,
-            'first_name': request.first_name,
-            'last_name': request.last_name,
-            'admission_no': request.admission_no,
-            'gender': request.gender,
-            'date_of_birth': request.date_of_birth,
-            'family_id': request.family_id,
-            'class_id': request.class_id,
-            'lead_id': request.lead_id,
-            'status': 'active'
-        }).execute()
+        student_id = str(uuid.uuid4())
+        query = """
+            INSERT INTO students (id, school_id, first_name, last_name, admission_no, gender, date_of_birth, family_id, class_id, lead_id, status, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        """
+        cursor.execute(query, (
+            student_id,
+            current_user.schoolId,
+            request.first_name,
+            request.last_name,
+            request.admission_no,
+            request.gender,
+            request.date_of_birth,
+            request.family_id,
+            request.class_id,
+            request.lead_id,
+            'active'
+        ))
+        db.commit()
         
-        return {"success": True, "student": result.data[0]}
+        return {"success": True, "student_id": student_id}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 @router.get("/")
 async def get_students(
     current_user: AuthUser = Depends(get_current_user)
 ):
     """Get all students for the school"""
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     
     try:
-        result = supabase.table('students').select('*').eq('school_id', current_user.schoolId).execute()
-        return {"students": result.data}
+        query = "SELECT * FROM students WHERE school_id = %s"
+        cursor.execute(query, (current_user.schoolId,))
+        students = cursor.fetchall()
+        return {"students": students}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 @router.get("/{student_id}")
 async def get_student(
@@ -81,19 +98,22 @@ async def get_student(
     current_user: AuthUser = Depends(get_current_user)
 ):
     """Get a specific student by ID"""
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     
     try:
-        result = supabase.table('students').select('*').eq('id', student_id).eq('school_id', current_user.schoolId).execute()
-        
-        if not result.data:
+        query = "SELECT * FROM students WHERE id = %s AND school_id = %s"
+        cursor.execute(query, (student_id, current_user.schoolId))
+        student = cursor.fetchone()
+        if not student:
             raise HTTPException(status_code=404, detail="Student not found")
-        
-        return {"student": result.data[0]}
+        return {"student": student}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 @router.patch("/{student_id}")
 async def update_student(
@@ -105,7 +125,8 @@ async def update_student(
     if not check_student_permission(current_user):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     
     try:
         update_data = {}
@@ -126,16 +147,28 @@ async def update_student(
         if request.status:
             update_data['status'] = request.status
         
-        result = supabase.table('students').update(update_data).eq('id', student_id).eq('school_id', current_user.schoolId).execute()
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No fields to update")
         
-        if not result.data:
+        set_clause = ", ".join([f"{k} = %s" for k in update_data.keys()])
+        values = list(update_data.values()) + [student_id, current_user.schoolId]
+        
+        query = f"UPDATE students SET {set_clause}, updated_at = NOW() WHERE id = %s AND school_id = %s"
+        cursor.execute(query, values)
+        
+        if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Student not found")
         
-        return {"success": True, "student": result.data[0]}
+        db.commit()
+        return {"success": True}
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 @router.delete("/{student_id}")
 async def delete_student(
@@ -146,19 +179,26 @@ async def delete_student(
     if current_user.role != "school_admin":
         raise HTTPException(status_code=403, detail="Only school admins can delete students")
     
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     
     try:
-        result = supabase.table('students').delete().eq('id', student_id).eq('school_id', current_user.schoolId).execute()
+        query = "DELETE FROM students WHERE id = %s AND school_id = %s"
+        cursor.execute(query, (student_id, current_user.schoolId))
         
-        if not result.data:
+        if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Student not found")
         
+        db.commit()
         return {"success": True}
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 @router.post("/import/csv")
 async def import_students_csv(
@@ -172,43 +212,37 @@ async def import_students_csv(
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Only CSV files are allowed")
     
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     
     try:
         content = await file.read()
         csv_file = io.StringIO(content.decode('utf-8'))
         csv_reader = csv.DictReader(csv_file)
         
-        students_created = []
-        errors = []
+        imported_count = 0
+        for row in csv_reader:
+            student_id = str(uuid.uuid4())
+            query = """
+                INSERT INTO students (id, school_id, first_name, last_name, admission_no, gender, date_of_birth, status, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            """
+            cursor.execute(query, (
+                student_id,
+                current_user.schoolId,
+                row.get('first_name', ''),
+                row.get('last_name', ''),
+                row.get('admission_no', ''),
+                row.get('gender', ''),
+                row.get('date_of_birth', None),
+                'active'
+            ))
+            imported_count += 1
         
-        for row_num, row in enumerate(csv_reader, start=2):
-            try:
-                student_data = {
-                    'school_id': current_user.schoolId,
-                    'first_name': row.get('first_name', '').strip(),
-                    'last_name': row.get('last_name', '').strip(),
-                    'admission_no': row.get('admission_no', '').strip() or None,
-                    'gender': row.get('gender', '').strip() or None,
-                    'date_of_birth': row.get('date_of_birth', '').strip() or None,
-                    'status': 'active'
-                }
-                
-                if not student_data['first_name'] or not student_data['last_name']:
-                    errors.append(f"Row {row_num}: Missing first_name or last_name")
-                    continue
-                
-                result = supabase.table('students').insert(student_data).execute()
-                students_created.append(result.data[0])
-                
-            except Exception as e:
-                errors.append(f"Row {row_num}: {str(e)}")
-        
-        return {
-            "success": True,
-            "students_created": len(students_created),
-            "students": students_created,
-            "errors": errors
-        }
+        db.commit()
+        return {"success": True, "imported": imported_count}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()

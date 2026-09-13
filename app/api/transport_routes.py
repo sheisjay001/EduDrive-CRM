@@ -3,7 +3,8 @@ from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel
 from app.core.auth import get_current_user, AuthUser, has_permission
-from app.database.session import get_supabase_client
+from app.database.session import get_db
+import uuid
 
 router = APIRouter(prefix="/transport", tags=["transport"])
 compat_router = APIRouter(tags=["transport"])
@@ -128,22 +129,31 @@ async def create_bus_route(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "create")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        row = {
-            "route_name": payload.route_name,
-            "route_code": payload.route_code,
-            "capacity": payload.capacity,
-            "driver_name": payload.driver_name,
-            "vehicle_number": payload.vehicle_number,
-            "status": payload.status,
-        }
-        if current_user.school_id:
-            row["school_id"] = current_user.school_id
-        result = supabase.table("bus_routes").insert(row).execute()
-        return result.data[0] if result.data else row
+        route_id = str(uuid.uuid4())
+        query = """
+            INSERT INTO bus_routes (id, school_id, route_name, route_code, capacity, driver_name, vehicle_number, status, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        """
+        cursor.execute(query, (
+            route_id,
+            current_user.schoolId,
+            payload.route_name,
+            payload.route_code,
+            payload.capacity,
+            payload.driver_name,
+            payload.vehicle_number,
+            payload.status
+        ))
+        db.commit()
+        return {"id": route_id, "route_name": payload.route_name}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.put("/bus-routes/{route_id}")
@@ -153,18 +163,32 @@ async def update_bus_route(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "edit")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        existing = supabase.table("bus_routes").select("id").eq("id", route_id).execute()
-        if not existing.data:
-            raise HTTPException(status_code=404, detail="Bus route not found")
         changes = payload.model_dump(exclude_none=True)
-        result = supabase.table("bus_routes").update(changes).eq("id", route_id).execute()
-        return result.data[0] if result.data else {"id": route_id, **changes}
+        if not changes:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        set_clause = ", ".join([f"{k} = %s" for k in changes.keys()])
+        values = list(changes.values()) + [route_id, current_user.schoolId]
+        
+        query = f"UPDATE bus_routes SET {set_clause}, updated_at = NOW() WHERE id = %s AND school_id = %s"
+        cursor.execute(query, values)
+        
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Bus route not found")
+        
+        db.commit()
+        return {"id": route_id, **changes}
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.delete("/bus-routes/{route_id}")
@@ -173,14 +197,20 @@ async def delete_bus_route(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "delete")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        supabase.table("student_transport").delete().eq("route_id", route_id).execute()
-        supabase.table("bus_stops").delete().eq("route_id", route_id).execute()
-        supabase.table("bus_routes").delete().eq("id", route_id).execute()
+        # Delete related records first
+        cursor.execute("DELETE FROM student_transport WHERE route_id = %s", (route_id,))
+        cursor.execute("DELETE FROM bus_stops WHERE route_id = %s", (route_id,))
+        cursor.execute("DELETE FROM bus_routes WHERE id = %s AND school_id = %s", (route_id, current_user.schoolId))
+        db.commit()
         return {"success": True}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 # ------------------- Bus Stops -------------------
@@ -208,20 +238,29 @@ async def create_bus_stop(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "create")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        row = {
-            "route_id": payload.route_id,
-            "stop_name": payload.stop_name,
-            "location": payload.location,
-            "stop_order": payload.stop_order,
-        }
-        if current_user.school_id:
-            row["school_id"] = current_user.school_id
-        result = supabase.table("bus_stops").insert(row).execute()
-        return result.data[0] if result.data else row
+        stop_id = str(uuid.uuid4())
+        query = """
+            INSERT INTO bus_stops (id, school_id, route_id, stop_name, location, stop_order, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+        """
+        cursor.execute(query, (
+            stop_id,
+            current_user.schoolId,
+            payload.route_id,
+            payload.stop_name,
+            payload.location,
+            payload.stop_order
+        ))
+        db.commit()
+        return {"id": stop_id, "stop_name": payload.stop_name}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.put("/bus-stops/{stop_id}")
@@ -231,18 +270,32 @@ async def update_bus_stop(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "edit")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        existing = supabase.table("bus_stops").select("id").eq("id", stop_id).execute()
-        if not existing.data:
-            raise HTTPException(status_code=404, detail="Bus stop not found")
         changes = payload.model_dump(exclude_none=True)
-        result = supabase.table("bus_stops").update(changes).eq("id", stop_id).execute()
-        return result.data[0] if result.data else {"id": stop_id, **changes}
+        if not changes:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        set_clause = ", ".join([f"{k} = %s" for k in changes.keys()])
+        values = list(changes.values()) + [stop_id, current_user.schoolId]
+        
+        query = f"UPDATE bus_stops SET {set_clause}, updated_at = NOW() WHERE id = %s AND school_id = %s"
+        cursor.execute(query, values)
+        
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Bus stop not found")
+        
+        db.commit()
+        return {"id": stop_id, **changes}
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.delete("/bus-stops/{stop_id}")
@@ -251,12 +304,18 @@ async def delete_bus_stop(
     current_user: AuthUser = Depends(get_current_user)
 ):
     _enforce_transport_perm(current_user, "delete")
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        supabase.table("bus_stops").delete().eq("id", stop_id).execute()
+        query = "DELETE FROM bus_stops WHERE id = %s AND school_id = %s"
+        cursor.execute(query, (stop_id, current_user.schoolId))
+        db.commit()
         return {"success": True}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 # ------------------- Student Transport Assignment -------------------

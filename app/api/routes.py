@@ -1,15 +1,8 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
-
-from app.core.auth import (
-    authenticate_user,
-    create_tokens_for_user,
-    decode_refresh_token,
-    get_current_user,
-    require_role,
-    require_any_role,
-    has_permission,
-)
+from pydantic import BaseModel
+from typing import Optional
+from app.core.auth import get_current_user, require_any_role, require_role, AuthUser, has_permission
 from app.database.session import get_db
 from app.schemas.crm import (
     AdmissionsResponse,
@@ -308,32 +301,40 @@ def lead_detail(lead_id: str, current_user: AuthUser = Depends(get_current_user)
 
 @router.post("/leads", response_model=LeadDetailResponse)
 def create_lead(payload: LeadCreateRequest, current_user: AuthUser = Depends(require_any_role(["school_admin", "admissions_officer"]))) -> LeadDetailResponse:
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        lead_data = {
-            'first_name': payload.firstName,
-            'last_name': payload.lastName,
-            'parent_name': payload.parentName,
-            'parent_phone': payload.parentPhone,
-            'parent_email': payload.parentEmail,
-            'source': payload.source,
-            'stage': payload.stage or 'new',
-            'interested_class': payload.interestedClass
-        }
-        
-        if current_user.schoolId:
-            lead_data['school_id'] = current_user.schoolId
-        
-        result = supabase.table('leads').insert(lead_data).execute()
-        return demo_data.get_lead_detail(str(result.data[0]['id']))
+        lead_id = str(uuid.uuid4())
+        query = """
+            INSERT INTO leads (id, school_id, first_name, last_name, parent_name, parent_phone, parent_email, source, stage, interested_class, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        """
+        cursor.execute(query, (
+            lead_id,
+            current_user.schoolId,
+            payload.firstName,
+            payload.lastName,
+            payload.parentName,
+            payload.parentPhone,
+            payload.parentEmail,
+            payload.source,
+            payload.stage or 'new',
+            payload.interestedClass
+        ))
+        db.commit()
+        return demo_data.get_lead_detail(lead_id)
     except Exception as e:
+        db.rollback()
         print(f"Error creating lead: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.patch("/leads/{lead_id}", response_model=LeadDetailResponse)
 def update_lead(lead_id: str, payload: LeadUpdateRequest, current_user: AuthUser = Depends(require_any_role(["school_admin", "admissions_officer"]))) -> LeadDetailResponse:
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
         update_data = {}
         if payload.firstName:
@@ -350,35 +351,62 @@ def update_lead(lead_id: str, payload: LeadUpdateRequest, current_user: AuthUser
             update_data['stage'] = payload.stage
         if payload.interestedClass:
             update_data['interested_class'] = payload.interestedClass
-        if payload.lostReason:
-            update_data['lost_reason'] = payload.lostReason
         
-        result = supabase.table('leads').update(update_data).eq('id', lead_id).eq('school_id', current_user.schoolId).execute()
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        set_clause = ", ".join([f"{k} = %s" for k in update_data.keys()])
+        values = list(update_data.values()) + [lead_id, current_user.schoolId]
+        
+        query = f"UPDATE leads SET {set_clause}, updated_at = NOW() WHERE id = %s AND school_id = %s"
+        cursor.execute(query, values)
+        
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Lead not found")
+        
+        db.commit()
         return demo_data.get_lead_detail(lead_id)
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
+        db.rollback()
+        print(f"Error updating lead: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.patch("/leads/{lead_id}/stage")
 def update_lead_stage(lead_id: str, payload: dict, current_user: AuthUser = Depends(require_any_role(["school_admin", "admissions_officer"]))) -> dict:
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        result = supabase.table('leads').update({
-            'stage': payload.get("stage", "new")
-        }).eq('id', lead_id).eq('school_id', current_user.schoolId).execute()
+        query = "UPDATE leads SET stage = %s, updated_at = NOW() WHERE id = %s AND school_id = %s"
+        cursor.execute(query, (payload.get("stage", "new"), lead_id, current_user.schoolId))
+        db.commit()
         return {"id": lead_id, "stage": payload.get("stage", "new")}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.delete("/leads/{lead_id}")
 def delete_lead(lead_id: str, current_user: AuthUser = Depends(require_any_role(["school_admin", "admissions_officer"]))) -> dict:
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        result = supabase.table('leads').delete().eq('id', lead_id).eq('school_id', current_user.schoolId).execute()
+        query = "DELETE FROM leads WHERE id = %s AND school_id = %s"
+        cursor.execute(query, (lead_id, current_user.schoolId))
+        db.commit()
         return {"success": True, "id": lead_id}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.get("/families", response_model=FamiliesResponse)
@@ -406,22 +434,34 @@ def family_detail(family_id: str, current_user: AuthUser = Depends(get_current_u
 
 @router.post("/families")
 def create_family(payload: dict, current_user: AuthUser = Depends(require_any_role(["school_admin", "admissions_officer"]))) -> dict:
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        result = supabase.table('families').insert({
-            'school_id': current_user.schoolId,
-            'household_name': payload.get('household_name'),
-            'billing_contact_parent_id': payload.get('billing_contact_parent_id'),
-            'status': 'active'
-        }).execute()
-        return {"success": True, "family": result.data[0]}
+        family_id = str(uuid.uuid4())
+        query = """
+            INSERT INTO families (id, school_id, household_name, billing_contact_parent_id, status, created_at)
+            VALUES (%s, %s, %s, %s, %s, NOW())
+        """
+        cursor.execute(query, (
+            family_id,
+            current_user.schoolId,
+            payload.get('household_name'),
+            payload.get('billing_contact_parent_id'),
+            'active'
+        ))
+        db.commit()
+        return {"success": True, "family_id": family_id}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.patch("/families/{family_id}")
 def update_family(family_id: str, payload: dict, current_user: AuthUser = Depends(require_any_role(["school_admin", "admissions_officer"]))) -> dict:
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
         update_data = {}
         if payload.get('household_name'):
@@ -431,20 +471,44 @@ def update_family(family_id: str, payload: dict, current_user: AuthUser = Depend
         if payload.get('status'):
             update_data['status'] = payload['status']
         
-        result = supabase.table('families').update(update_data).eq('id', family_id).eq('school_id', current_user.schoolId).execute()
-        return {"success": True, "family": result.data[0]}
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        set_clause = ", ".join([f"{k} = %s" for k in update_data.keys()])
+        values = list(update_data.values()) + [family_id, current_user.schoolId]
+        
+        query = f"UPDATE families SET {set_clause}, updated_at = NOW() WHERE id = %s AND school_id = %s"
+        cursor.execute(query, values)
+        
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Family not found")
+        
+        db.commit()
+        return {"success": True}
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.delete("/families/{family_id}")
 def delete_family(family_id: str, current_user: AuthUser = Depends(require_role("school_admin"))) -> dict:
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        result = supabase.table('families').delete().eq('id', family_id).eq('school_id', current_user.schoolId).execute()
+        query = "DELETE FROM families WHERE id = %s AND school_id = %s"
+        cursor.execute(query, (family_id, current_user.schoolId))
+        db.commit()
         return {"success": True, "id": family_id}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.get("/parents", response_model=ParentsResponse)
@@ -472,25 +536,37 @@ def parent_detail(parent_id: str, current_user: AuthUser = Depends(get_current_u
 
 @router.post("/parents")
 def create_parent(payload: dict, current_user: AuthUser = Depends(require_any_role(["school_admin", "admissions_officer"]))) -> dict:
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        result = supabase.table('parents').insert({
-            'school_id': current_user.schoolId,
-            'family_id': payload.get('family_id'),
-            'full_name': payload.get('full_name'),
-            'email': payload.get('email'),
-            'phone': payload.get('phone'),
-            'relationship': payload.get('relationship'),
-            'preferred_channel': payload.get('preferred_channel', 'email')
-        }).execute()
-        return {"success": True, "parent": result.data[0]}
+        parent_id = str(uuid.uuid4())
+        query = """
+            INSERT INTO parents (id, school_id, family_id, full_name, email, phone, relationship, preferred_channel, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        """
+        cursor.execute(query, (
+            parent_id,
+            current_user.schoolId,
+            payload.get('family_id'),
+            payload.get('full_name'),
+            payload.get('email'),
+            payload.get('phone'),
+            payload.get('relationship'),
+            payload.get('preferred_channel', 'email')
+        ))
+        db.commit()
+        return {"success": True, "parent_id": parent_id}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.patch("/parents/{parent_id}")
 def update_parent(parent_id: str, payload: dict, current_user: AuthUser = Depends(require_any_role(["school_admin", "admissions_officer"]))) -> dict:
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
         update_data = {}
         if payload.get('full_name'):
@@ -504,20 +580,44 @@ def update_parent(parent_id: str, payload: dict, current_user: AuthUser = Depend
         if payload.get('preferred_channel'):
             update_data['preferred_channel'] = payload['preferred_channel']
         
-        result = supabase.table('parents').update(update_data).eq('id', parent_id).eq('school_id', current_user.schoolId).execute()
-        return {"success": True, "parent": result.data[0]}
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        set_clause = ", ".join([f"{k} = %s" for k in update_data.keys()])
+        values = list(update_data.values()) + [parent_id, current_user.schoolId]
+        
+        query = f"UPDATE parents SET {set_clause}, updated_at = NOW() WHERE id = %s AND school_id = %s"
+        cursor.execute(query, values)
+        
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Parent not found")
+        
+        db.commit()
+        return {"success": True}
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.delete("/parents/{parent_id}")
 def delete_parent(parent_id: str, current_user: AuthUser = Depends(require_role("school_admin"))) -> dict:
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
-        result = supabase.table('parents').delete().eq('id', parent_id).eq('school_id', current_user.schoolId).execute()
+        query = "DELETE FROM parents WHERE id = %s AND school_id = %s"
+        cursor.execute(query, (parent_id, current_user.schoolId))
+        db.commit()
         return {"success": True, "id": parent_id}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
 
 
 @router.post("/leads/{lead_id}/convert", response_model=ConvertLeadResponse)
