@@ -1253,7 +1253,41 @@ def report_detail(report_name: str, current_user: AuthUser = Depends(get_current
 def settings_overview(current_user: AuthUser = Depends(get_current_user)) -> SettingsResponse:
     if not has_permission(current_user, "settings:view"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
-    return demo_data.get_settings()
+    
+    # Fetch actual school data from DB
+    school_name = "Your School"
+    school_email = ""
+    
+    db = get_db()
+    cursor = db.cursor()
+    try:
+        if current_user.schoolId:
+            cursor.execute("SELECT name, slug FROM schools WHERE id = %s", (current_user.schoolId,))
+            school_result = cursor.fetchone()
+            if school_result:
+                school_name = school_result['name']
+                slug = school_result.get('slug', '')
+                # Derive a sensible primary contact email from the slug if available
+                if slug:
+                    school_email = f"hello@{slug}.ng"
+    finally:
+        cursor.close()
+    
+    # Use demo template but inject real school identity
+    settings = demo_data.get_settings()
+    for group in settings.groups:
+        if group.title == "School Identity":
+            for item in group.items:
+                if item.label == "School name":
+                    item.value = school_name
+                elif item.label == "Primary contact":
+                    item.value = school_email or (current_user.email if current_user.email else "Not configured")
+        elif group.title == "Communication Channels":
+            for item in group.items:
+                if item.label == "Termii sender":
+                    # Use a short version of the school name (first 11 chars) as sender ID
+                    item.value = school_name[:11]
+    return settings
 
 
 @router.patch("/settings")

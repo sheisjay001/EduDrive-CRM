@@ -33,12 +33,12 @@ def authenticate_user(email: str, password: str) -> Optional[AuthUser]:
         
         # Query user from database
         query = """
-            SELECT u.id, u.email, u.full_name, u.password_hash, u.status, u.is_active,
-                   ur.role, ur.school_id, s.slug as school_slug
+            SELECT u.id, u.email, u.full_name, u.password_hash, u.status,
+                   u.school_id, r.name as role_name, s.slug as school_slug
             FROM users u
-            LEFT JOIN user_roles ur ON u.id = ur.user_id
-            LEFT JOIN schools s ON ur.school_id = s.id
-            WHERE u.email = %s AND u.is_active = TRUE
+            LEFT JOIN roles r ON u.role_id = r.id
+            LEFT JOIN schools s ON u.school_id = s.id
+            WHERE u.email = %s AND u.status = 'active'
         """
         cursor.execute(query, (email,))
         user_data = cursor.fetchone()
@@ -57,7 +57,7 @@ def authenticate_user(email: str, password: str) -> Optional[AuthUser]:
         cursor.execute(update_query, (user_data['id'],))
         db.commit()
         
-        role = user_data.get('role', 'school_admin') or 'school_admin'
+        role = user_data.get('role_name', 'school_admin') or 'school_admin'
         school_id = user_data.get('school_id', '') or ''
         school_slug = user_data.get('school_slug', '') or ''
         

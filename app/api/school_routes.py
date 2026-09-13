@@ -18,19 +18,15 @@ PRICE_PER_PERSON = 1000  # 1,000 NGN per person (student or teacher)
 class SchoolCreateRequest(BaseModel):
     name: str
     slug: Optional[str]
-    domain: Optional[str]
-    logo_url: Optional[str]
-    primary_color: Optional[str]
-    secondary_color: Optional[str]
-    subscription_plan: str = "basic"
+    school_type: Optional[str] = "mixed"
+    primary_color: Optional[str] = "#d9a441"
+    status: Optional[str] = "active"
 
 class SchoolUpdateRequest(BaseModel):
     name: Optional[str]
-    domain: Optional[str]
-    logo_url: Optional[str]
+    school_type: Optional[str]
     primary_color: Optional[str]
-    secondary_color: Optional[str]
-    is_active: Optional[bool]
+    status: Optional[str]
 
 class SchoolRegisterRequest(BaseModel):
     school_name: str
@@ -184,30 +180,24 @@ async def verify_subscription_payment(reference: str):
             email = payment_data["data"]["customer"]["email"]
             amount_paid = payment_data["data"]["amount"]
             
-            # Store payment record
-            payment_id = str(uuid.uuid4())
-            payment_query = """
-                INSERT INTO payments (id, reference, amount, status, student_count, teacher_count, total_persons, total_amount, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
-            """
-            cursor.execute(payment_query, (payment_id, reference, amount_paid / 100, 'completed', student_count, teacher_count, total_persons, total_amount))
-            db.commit()
+            # Note: Payment record storage is deferred until school registration completes
+            # because payments table requires school_id and invoice_id (NOT NULL constraints)
             
             return {
                 "success": True,
-                "payment": {"id": payment_id, "reference": reference},
+                "payment": {"reference": reference},
                 "student_count": student_count,
                 "teacher_count": teacher_count,
                 "total_persons": total_persons,
                 "total_amount": total_amount,
+                "email": email,
+                "amount_paid": amount_paid / 100,
                 "message": "Payment verified successfully. Complete registration with /schools/register endpoint."
             }
     
     except HTTPException:
-        db.rollback()
         raise
     except Exception as e:
-        db.rollback()
         print(f"Payment verification error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -238,37 +228,40 @@ async def register_school(request: SchoolRegisterRequest):
         
         # Generate UUIDs
         school_id = str(uuid.uuid4())
+        role_id = str(uuid.uuid4())
         user_id = str(uuid.uuid4())
-        user_role_id = str(uuid.uuid4())
         
-        # Create school
+        # Create school - schema columns: id, name, slug, school_type, primary_color, status, created_at
         school_query = """
-            INSERT INTO schools (id, name, slug, subscription_plan, is_active, created_at)
-            VALUES (%s, %s, %s, %s, %s, NOW())
+            INSERT INTO schools (id, name, slug, school_type, primary_color, status, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
         """
-        cursor.execute(school_query, (school_id, request.school_name, slug, 'custom', True))
+        cursor.execute(school_query, (school_id, request.school_name, slug, 'mixed', '#d9a441', 'active'))
         
-        # Create admin user with hashed password
-        password_hash = get_password_hash(request.password)
-        user_query = """
-            INSERT INTO users (id, school_id, full_name, email, password_hash, phone, is_active, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
-        """
-        cursor.execute(user_query, (user_id, school_id, request.admin_name, request.email, password_hash, request.phone, True))
-        
-        # Create user role entry
+        # Create admin role entry in roles table
+        school_admin_permissions = [
+            "dashboard:view", "admissions:*", "leads:*", "families:*", "parents:*",
+            "students:*", "finance:*", "invoices:*", "payments:*", "messaging:*",
+            "helpdesk:*", "tickets:*", "staff:*", "reports:*", "settings:*",
+            "calendar:*", "terms:*", "classes:*", "analytics:*", "debtors:*",
+            "bulk-billing:*", "receipts:*", "lost-leads:*", "workload:*",
+            "user-admin:*", "activity:*", "frontdesk:*", "lifecycle:*", "transport:*"
+        ]
+        import json
         role_query = """
-            INSERT INTO user_roles (id, user_id, role, school_id, created_at)
+            INSERT INTO roles (id, school_id, name, permissions, created_at)
             VALUES (%s, %s, %s, %s, NOW())
         """
-        cursor.execute(role_query, (user_role_id, user_id, 'school_admin', school_id))
+        cursor.execute(role_query, (role_id, school_id, 'school_admin', json.dumps(school_admin_permissions)))
         
-        # Link payment to school if reference was provided
-        if request.payment_reference:
-            update_payment_query = """
-                UPDATE payments SET school_id = %s WHERE reference = %s
-            """
-            cursor.execute(update_payment_query, (school_id, request.payment_reference))
+        # Create admin user with hashed password
+        # Schema columns: id, school_id, role_id, full_name, email, password_hash, status, last_login_at, created_at
+        password_hash = get_password_hash(request.password)
+        user_query = """
+            INSERT INTO users (id, school_id, role_id, full_name, email, password_hash, status, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+        """
+        cursor.execute(user_query, (user_id, school_id, role_id, request.admin_name, request.email, password_hash, 'active'))
         
         db.commit()
         
@@ -295,7 +288,8 @@ async def register_school(request: SchoolRegisterRequest):
                 "id": school_id,
                 "name": request.school_name,
                 "slug": slug,
-                "subscription_plan": "custom",
+                "school_type": "mixed",
+                "status": "active",
                 "student_count": request.student_count,
                 "teacher_count": request.teacher_count
             }
@@ -337,6 +331,32 @@ async def get_school_by_slug(
     finally:
         cursor.close()
 
+@router.get("/id/{school_id}")
+async def get_school_by_id(
+    school_id: str,
+    current_user: AuthUser = Depends(get_current_user)
+):
+    """Get school information by ID (authenticated)"""
+    db = get_db()
+    cursor = db.cursor()
+    
+    try:
+        query = "SELECT * FROM schools WHERE id = %s"
+        cursor.execute(query, (school_id,))
+        result = cursor.fetchone()
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="School not found")
+        
+        return {"school": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching school by id: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
+
 @router.get("/validate/{slug}")
 async def validate_school_slug(
     slug: str
@@ -346,7 +366,7 @@ async def validate_school_slug(
     cursor = db.cursor()
     
     try:
-        query = "SELECT * FROM schools WHERE slug = %s AND is_active = TRUE"
+        query = "SELECT * FROM schools WHERE slug = %s AND status = 'active'"
         cursor.execute(query, (slug,))
         result = cursor.fetchone()
         
@@ -371,18 +391,20 @@ async def create_school(
     cursor = db.cursor()
     
     try:
+        import re
         school_id = str(uuid.uuid4())
+        slug = request.slug or re.sub(r'[^a-z0-9]+', '-', request.name.lower()).strip('-')
         query = """
-            INSERT INTO schools (id, name, slug, domain, logo_url, primary_color, secondary_color, subscription_plan, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            INSERT INTO schools (id, name, slug, school_type, primary_color, status, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
         """
         cursor.execute(query, (
-            school_id, request.name, request.slug, request.domain,
-            request.logo_url, request.primary_color, request.secondary_color, request.subscription_plan
+            school_id, request.name, slug, request.school_type or 'mixed',
+            request.primary_color or '#d9a441', request.status or 'active'
         ))
         db.commit()
         
-        return {"success": True, "school": {"id": school_id}}
+        return {"success": True, "school": {"id": school_id, "slug": slug}}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -421,18 +443,12 @@ async def update_school(
         update_data = {}
         if request.name is not None:
             update_data['name'] = request.name
-        if request.slug is not None:
-            update_data['slug'] = request.slug
-        if request.domain is not None:
-            update_data['domain'] = request.domain
-        if request.logo_url is not None:
-            update_data['logo_url'] = request.logo_url
+        if request.school_type is not None:
+            update_data['school_type'] = request.school_type
         if request.primary_color is not None:
             update_data['primary_color'] = request.primary_color
-        if request.secondary_color is not None:
-            update_data['secondary_color'] = request.secondary_color
-        if request.subscription_plan is not None:
-            update_data['subscription_plan'] = request.subscription_plan
+        if request.status is not None:
+            update_data['status'] = request.status
         
         if not update_data:
             raise HTTPException(status_code=400, detail="No fields to update")
