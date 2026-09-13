@@ -65,7 +65,7 @@ export default function ParentBusRoutesPage() {
         <div className="space-y-6">
           {childRoute ? (
             <Card className="p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Your Child's Transportation</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">Your Child&apos;s Transportation</h3>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                   <p className="text-xs uppercase tracking-wider text-[#9eb1cf]">Child</p>
@@ -160,7 +160,7 @@ export default function ParentBusRoutesPage() {
               <div>
                 <h4 className="font-semibold text-white">Transportation Changes</h4>
                 <p className="mt-1 text-sm text-[#c9d7ef]">
-                  If you need to change your child's bus route or pickup location, please contact the school administration at least 48 hours in advance.
+                  If you need to change your child&apos;s bus route or pickup location, please contact the school administration at least 48 hours in advance.
                 </p>
               </div>
             </div>

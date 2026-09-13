@@ -141,7 +141,7 @@ function SignupForm() {
                     <button
                       key={option.value}
                       type="button"
-                      onClick={() => form.setValue("role", option.value as any)}
+                      onClick={() => form.setValue("role", option.value as "teacher" | "parent" | "student")}
                       className={`flex flex-col items-center gap-2 rounded-2xl border p-4 transition ${
                         selectedRole === option.value
                           ? "border-[#d9a441] bg-[#d9a441]/10"

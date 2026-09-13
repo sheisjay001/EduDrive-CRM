@@ -188,7 +188,7 @@ export default function MessagingPage() {
               {notificationsLoading ? (
                 <p className="text-center text-[#9eb1cf]">Loading notifications…</p>
               ) : notifications.length === 0 ? (
-                <p className="text-center text-[#9eb1cf]">No notifications yet — click "Create Notification" to send your first one.</p>
+                <p className="text-center text-[#9eb1cf]">No notifications yet — click &quot;Create Notification&quot; to send your first one.</p>
               ) : (
                 notifications.map((notification) => (
                   <div key={notification.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
