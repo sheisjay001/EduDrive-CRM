@@ -117,7 +117,7 @@ export default function DashboardPage() {
               <div className="mt-4 flex items-center gap-4">
                 <div className="flex-1 rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
                   <code className="text-sm text-[#f9d28a]">
-                    {window.location.origin}/{schoolSlug}
+                    {window.location.origin}/{schoolSlug}/signup
                   </code>
                 </div>
                 <button

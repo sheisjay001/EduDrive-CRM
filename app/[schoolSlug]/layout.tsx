@@ -3,6 +3,7 @@
 import { useSchool } from "@/lib/school-context";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 export default function SchoolLayout({
   children,
@@ -13,6 +14,7 @@ export default function SchoolLayout({
 }) {
   const { schoolInfo, isLoading, setSchoolSlug } = useSchool();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     params.then(({ schoolSlug }) => {
@@ -20,13 +22,16 @@ export default function SchoolLayout({
     });
   }, [params, setSchoolSlug]);
 
+  // Skip authentication check for signup page
+  const isSignupPage = pathname?.endsWith("/signup");
+
   useEffect(() => {
-    if (!isLoading && !schoolInfo) {
+    if (!isSignupPage && !isLoading && !schoolInfo) {
       router.push("/login");
     }
-  }, [isLoading, schoolInfo, router]);
+  }, [isLoading, schoolInfo, router, isSignupPage]);
 
-  if (isLoading) {
+  if (isLoading && !isSignupPage) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-white">Loading...</div>
@@ -34,7 +39,7 @@ export default function SchoolLayout({
     );
   }
 
-  if (!schoolInfo) {
+  if (!isSignupPage && !schoolInfo) {
     return null;
   }
 
