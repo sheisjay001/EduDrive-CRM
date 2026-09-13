@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from typing import Optional
+import uuid
 from app.core.auth import get_current_user, require_any_role, require_role, AuthUser, has_permission
 from app.database.session import get_db
 from app.schemas.crm import (
@@ -5346,21 +5347,32 @@ def revoke_session(session_id: str, current_user: AuthUser = Depends(get_current
 @router.post("/sessions/revoke-other")
 def revoke_other_sessions(current_user: AuthUser = Depends(get_current_user)):
     """Revoke all sessions except the caller's current one"""
-    supabase = get_supabase_client()
+    db = get_db()
+    cursor = db.cursor()
     try:
         # Fetch user sessions, keep most recent active, revoke others
-        result = supabase.table("user_sessions").select("*").eq("user_id", current_user.id).eq("is_active", True).order("created_at", desc=True).execute()
-        sessions = result.data or []
+        cursor.execute("""
+            SELECT * FROM user_sessions 
+            WHERE user_id = %s AND is_active = True 
+            ORDER BY created_at DESC
+        """, (current_user.id,))
+        sessions = cursor.fetchall()
+        
         revoked_ids = []
         for i, s in enumerate(sessions):
             if i == 0:
                 continue
-            supabase.table("user_sessions").update({
-                "is_active": False,
-                "revoked_at": datetime.now().isoformat(),
-                "revoked_by": current_user.id
-            }).eq("id", s["id"]).execute()
-            revoked_ids.append(s["id"])
+            cursor.execute("""
+                UPDATE user_sessions 
+                SET is_active = False, revoked_at = NOW(), revoked_by = %s 
+                WHERE id = %s
+            """, (current_user.id, s['id']))
+            revoked_ids.append(s['id'])
+        
+        db.commit()
         return {"success": True, "revoked_count": len(revoked_ids), "revoked_ids": revoked_ids}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
