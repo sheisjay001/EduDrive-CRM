@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
-    allowed_origins: list[str] = ["https://edudrive-crm.onrender.com", "https://*.onrender.com"]
+    allowed_origins: list[str] = ["https://edudrive-crm.onrender.com", "http://localhost:3000", "http://127.0.0.1:3000"]
     frontend_url: str = "https://edudrive-crm.onrender.com"  # Frontend URL for payment callbacks
     
     # Payment Gateway Configuration
