@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -116,13 +117,13 @@ function StudentLoginPageInner() {
           </form>
           <div className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
             <p>
-              <a href="/login" className="text-blue-600 hover:underline">
+              <Link href="/login" className="text-blue-600 hover:underline">
                 Staff Login
-              </a>
+              </Link>
               {" | "}
-              <a href="/parent-login" className="text-blue-600 hover:underline">
+              <Link href="/parent-login" className="text-blue-600 hover:underline">
                 Parent Login
-              </a>
+              </Link>
             </p>
           </div>
         </CardContent>
