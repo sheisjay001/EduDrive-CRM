@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from typing import Optional
 import uuid
-from app.core.auth import get_current_user, require_any_role, require_role, AuthUser, has_permission
+from app.core.auth import get_current_user, require_any_role, require_role, AuthUser, has_permission, authenticate_user, create_tokens_for_user
 from app.database.session import get_db
 from app.schemas.crm import (
     AdmissionsResponse,
