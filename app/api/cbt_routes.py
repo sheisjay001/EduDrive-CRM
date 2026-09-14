@@ -3,7 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from app.core.auth import get_current_user, require_role
+from app.core.auth import get_current_user, require_role, require_any_role
 from app.database.session import get_supabase_client
 
 router = APIRouter()
@@ -63,7 +63,7 @@ class CBTResultResponse(BaseModel):
 @router.post("/cbt/exams", response_model=CBTExamResponse)
 async def create_cbt_exam(
     exam_data: CBTExamCreate,
-    current_user = Depends(require_role(["admin", "super_admin", "school_admin"]))
+    current_user = Depends(require_any_role(["admin", "super_admin", "school_admin"]))
 ):
     supabase = get_supabase_client()
     
@@ -92,7 +92,7 @@ async def create_cbt_exam(
 @router.post("/cbt/questions", response_model=CBTQuestionResponse)
 async def add_cbt_question(
     question_data: CBTQuestionCreate,
-    current_user = Depends(require_role(["admin", "super_admin", "school_admin"]))
+    current_user = Depends(require_any_role(["admin", "super_admin", "school_admin"]))
 ):
     supabase = get_supabase_client()
     
@@ -153,7 +153,7 @@ async def get_all_cbt_exams(
 @router.delete("/cbt/exams/{exam_id}")
 async def delete_cbt_exam(
     exam_id: int,
-    current_user = Depends(require_role(["admin", "super_admin", "school_admin"]))
+    current_user = Depends(require_any_role(["admin", "super_admin", "school_admin"]))
 ):
     supabase = get_supabase_client()
     
@@ -169,7 +169,7 @@ async def delete_cbt_exam(
 async def update_cbt_exam(
     exam_id: int,
     payload: dict,
-    current_user = Depends(require_role(["admin", "super_admin", "school_admin"]))):
+    current_user = Depends(require_any_role(["admin", "super_admin", "school_admin"]))):
     supabase = get_supabase_client()
     
     try:
@@ -211,7 +211,7 @@ async def update_cbt_exam(
 # Student: Get Active Exams for Class
 @router.get("/cbt/exams/active", response_model=List[CBTExamResponse])
 async def get_active_exams_for_student(
-    current_user = Depends(require_role(["student"]))
+    current_user = Depends(require_role("student"))
 ):
     supabase = get_supabase_client()
     
@@ -244,7 +244,7 @@ async def get_active_exams_for_student(
 @router.get("/cbt/exams/{exam_id}/questions")
 async def get_exam_questions(
     exam_id: int,
-    current_user = Depends(require_role(["student"]))
+    current_user = Depends(require_role("student"))
 ):
     supabase = get_supabase_client()
     
@@ -324,7 +324,7 @@ async def submit_cbt_result(
 # Student: Get CBT History
 @router.get("/cbt/results/history", response_model=List[CBTResultResponse])
 async def get_cbt_history(
-    current_user = Depends(require_role(["student"]))
+    current_user = Depends(require_role("student"))
 ):
     supabase = get_supabase_client()
     
