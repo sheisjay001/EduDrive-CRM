@@ -102,21 +102,32 @@ router.include_router(notifications_router)
 
 @router.post("/auth/login", response_model=AuthResponse)
 def login(payload: AuthRequest) -> AuthResponse:
-    user = authenticate_user(payload.email, payload.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-        )
+    try:
+        user = authenticate_user(payload.email, payload.password)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+            )
 
-    access_token, refresh_token = create_tokens_for_user(user)
-    return AuthResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer",
-        expires_in=3600,
-        user=user,
-    )
+        access_token, refresh_token = create_tokens_for_user(user)
+        return AuthResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_type="bearer",
+            expires_in=3600,
+            user=user,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Login error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred during login. Please try again later."
+        )
 
 
 @router.post("/auth/signup", response_model=AuthResponse)

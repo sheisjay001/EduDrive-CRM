@@ -75,7 +75,8 @@ def authenticate_user(email: str, password: str) -> Optional[AuthUser]:
         print(f"Authentication error: {e}")
         import traceback
         traceback.print_exc()
-        return None
+        # Re-raise the exception to be caught by the login endpoint
+        raise
 
 
 def create_access_token(subject: str, extra: dict | None = None, expires_delta: timedelta | None = None) -> str:
